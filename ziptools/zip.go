@@ -30,6 +30,7 @@ var zipReaders = sync.Pool{New: func() interface{} {
 	return rdr
 }}
 
+//Testing if fresh download is not occurring due to checksum issue
 func GetGzipData(writer io.Writer, data []byte) error {
 	gz := zipWriters.Get().(*gzip.Writer)
 	defer zipWriters.Put(gz)
