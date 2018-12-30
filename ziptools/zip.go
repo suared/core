@@ -30,7 +30,7 @@ var zipReaders = sync.Pool{New: func() interface{} {
 	return rdr
 }}
 
-func getGzipData(writer io.Writer, data []byte) error {
+func GetGzipData(writer io.Writer, data []byte) error {
 	gz := zipWriters.Get().(*gzip.Writer)
 	defer zipWriters.Put(gz)
 	defer gz.Close()
@@ -48,7 +48,7 @@ func getGzipData(writer io.Writer, data []byte) error {
 	return nil
 }
 
-func getGunzipData(writer io.Writer, data []byte) error {
+func GetGunzipData(writer io.Writer, data []byte) error {
 	gz := zipReaders.Get().(*gzip.Reader)
 	defer zipReaders.Put(gz)
 	defer gz.Close()
