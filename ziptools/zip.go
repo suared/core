@@ -21,7 +21,7 @@ var zipReaders = sync.Pool{New: func() interface{} {
 	// A reader fails if not initialized with some zip data so creating some dummy data when initializing
 	var buf bytes.Buffer
 	data := []byte{}
-	_ = getGzipData(&buf, data)
+	_ = GetGzipData(&buf, data)
 	rdr, err := gzip.NewReader(&buf)
 	//log.Printf("At this point, rdr: %v", rdr)
 	if err != nil {

@@ -11,7 +11,7 @@ clean:
 	rm -f infratest
 
 .PHONY: test
-test: | infratest
+test: | infratest ziptest
 
 #No longer called, this is now handled by modules
 .PHONY: depcheck
@@ -25,6 +25,11 @@ infratest: infra infra/*.go
 	cd infra && go tool cover -html=coverage.out
 	@touch $@
 
+ziptest: ziptools ziptools/*.go
+	cd ziptools && go test -cover -coverprofile=coverage.out
+	cd ziptools && go vet
+	cd ziptools && go tool cover -html=coverage.out
+	@touch $@
 
 .PHONY: deploy
 deploy: clean build
