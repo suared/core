@@ -13,12 +13,12 @@ clean:
 	rm -f modeltest
 
 .PHONY: test
-test: | modeltest repotest apitest
+test: | depcheck modeltest repotest apitest
 
-#No longer called, this is now handled by modules
 .PHONY: depcheck
 depcheck: 
-	dep ensure	
+	go get -u
+	#Use go tidy before release testing
 
 #TODO: Change most of these to use stamps naming / hidden files
 apitest: api api/*.go
