@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 )
@@ -13,6 +14,8 @@ func init() {
 	//fmt.Println("This will get called on main initialization only")
 	setEnvironmentVariables()
 	loadEnvironmentVariables()
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 }
 

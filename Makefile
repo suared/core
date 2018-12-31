@@ -11,18 +11,24 @@ clean:
 	rm -f infratest
 
 .PHONY: test
-test: | infratest ziptest
+test: | depcheck infratest infraapitest ziptest
 
 #No longer called, this is now handled by modules
 .PHONY: depcheck
 depcheck: 
-	dep ensure	
+	go get -u
 
 #TODO: Change most of these to use stamps convention/ hidden files
 infratest: infra infra/*.go
 	cd infra && go test -cover -coverprofile=coverage.out
 	cd infra && go vet
 	cd infra && go tool cover -html=coverage.out
+	@touch $@
+
+infraapitest: infra/api infra/api/*.go
+	cd infra/api && go test -cover -coverprofile=coverage.out
+	cd infra/api && go vet
+	cd infra/api && go tool cover -html=coverage.out
 	@touch $@
 
 ziptest: ziptools ziptools/*.go
