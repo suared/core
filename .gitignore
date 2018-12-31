@@ -1,3 +1,7 @@
+# Add local make files to ignore
+infratest
+ziptest
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
