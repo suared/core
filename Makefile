@@ -11,9 +11,8 @@ clean:
 	rm -f infratest
 
 .PHONY: test
-test: | depcheck infratest infraapitest ziptest
+test: | depcheck infratest apitest ziptest
 
-#No longer called, this is now handled by modules
 .PHONY: depcheck
 depcheck: 
 	go get -u
@@ -25,10 +24,10 @@ infratest: infra infra/*.go
 	cd infra && go tool cover -html=coverage.out
 	@touch $@
 
-infraapitest: infra/api infra/api/*.go
-	cd infra/api && go test -cover -coverprofile=coverage.out
-	cd infra/api && go vet
-	cd infra/api && go tool cover -html=coverage.out
+apitest: api api/*.go
+	cd api && go test -cover -coverprofile=coverage.out
+	cd api && go vet
+	cd api && go tool cover -html=coverage.out
 	@touch $@
 
 ziptest: ziptools ziptools/*.go

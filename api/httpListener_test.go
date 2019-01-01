@@ -4,15 +4,22 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"testing"
 	"time"
+
+	_ "github.com/suared/core/infra"
 
 	"github.com/gorilla/mux"
 )
 
+//Using this as more of the integration test across the core arch setup
+//Other testers in this package will only handle the non-integration needs
+
 //test setup
 var httpClient *http.Client
 
+//sample struct that implements Config for route setup
 type testRoutes struct {
 }
 
@@ -24,23 +31,20 @@ func (routes testRoutes) SetupRoutes(router *mux.Router) {
 func init() {
 	//start listener
 	log.Println("Init called on listener test")
-	go StartHttpListener(testRoutes{})
-	// TODO: listen to startup vs. assuming like below
+	go StartHTTPListener(testRoutes{})
+	// TODO: listen to startup vs. assuming like below, this will work for now
 	time.Sleep(1 * time.Second)
 	//set local http client for validation
 	httpClient = &http.Client{}
 }
 
-//validate health check middleware (validates default host/port as side effect)
-//validate logging middleware
+//TODO: Setup and validate auth + cors + csrf + metrics middleware
 
-//TestHealthCheck - Validates healthcheck was setup as expected
+//TestHealthCheck - Validates healthcheck was setup as expected (validates default host/port as side effect)
 func TestHealthCheck(t *testing.T) {
 	//Setting as real integration style client vs. unit test style in mux example
 
-	log.Println("about to call health endpoint")
-	resp, err := httpClient.Get("http://127.0.0.1:8080/health")
-	log.Println("endpoipnt called...")
+	resp, err := httpClient.Get(os.Getenv("PROCESS_LISTEN_URI") + "/health")
 	if err != nil {
 		t.Fatal(err)
 	}

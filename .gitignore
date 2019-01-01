@@ -1,6 +1,6 @@
 # Add local make files to ignore
 infratest
-infraapitest
+apitest
 ziptest
 
 # Binaries for programs and plugins

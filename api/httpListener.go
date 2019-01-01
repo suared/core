@@ -9,28 +9,32 @@ import (
 	"os/signal"
 	"time"
 
+	//Core setup
+	_ "github.com/suared/core/infra"
+
 	"github.com/gorilla/mux"
 )
 
-type APIConfig interface {
+//Config - Interface to setup API specific routes
+type Config interface {
 	SetupRoutes(router *mux.Router)
 }
 
-//Uses the mux provided example starter
-//TODO: Change key hard codes to  env variables
-func StartHttpListener(apiConfig APIConfig) {
+//StartHTTPListener - Starts the Http server.  Uses the mux provided example starter and adds common middleware + router setup interface
+//TODO: Change additional hard codes to  env variables
+func StartHTTPListener(config Config) {
 	var wait time.Duration
 	flag.DurationVar(&wait, "graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
 	flag.Parse()
 
 	r := mux.NewRouter()
-	// Setup core handlers
+	// Setup core architecture handlers and routes
 	r.HandleFunc("/health", HealthCheckHandler)
 	// Add your routes as needed - tie API specific middleware to routes or sub-routes
-	apiConfig.SetupRoutes(r)
+	config.SetupRoutes(r)
 
 	srv := &http.Server{
-		Addr: "127.0.0.1:8080",
+		Addr: os.Getenv("PROCESS_LISTEN_ADDR"),
 		// Good practice to set timeouts to avoid Slowloris attacks.
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
