@@ -6,11 +6,15 @@ build:
 	#zip -j bin/process.zip bin/process
 	#rm bin/process 
 
+.PHONY: commitcheck
+commitcheck: clean test
+
 .PHONY: clean
 clean:
 	rm -f apitest
 	rm -f repotest
 	rm -f modeltest
+	go mod tidy
 
 .PHONY: test
 test: | depcheck modeltest repotest apitest
