@@ -43,7 +43,6 @@ func init() {
 //TestHealthCheck - Validates healthcheck was setup as expected (validates default host/port as side effect)
 func TestHealthCheck(t *testing.T) {
 	//Setting as real integration style client vs. unit test style in mux example
-
 	resp, err := httpClient.Get(os.Getenv("PROCESS_LISTEN_URI") + "/health")
 	if err != nil {
 		t.Fatal(err)

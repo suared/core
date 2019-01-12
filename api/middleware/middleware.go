@@ -6,6 +6,9 @@ import (
 
 // SetUpMiddleware contains the middleware that applies to every request.
 // Reference middlewares here --> https://github.com/urfave/negroni#logger
+
+// The Google example here should be used as an additional base element for the architecture:
+// https://blog.golang.org/context
 func SetUpMiddleware(router *mux.Router) {
 	// Add each middleware needed as core setup here as they are ready
 

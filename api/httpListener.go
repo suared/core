@@ -28,10 +28,12 @@ func StartHTTPListener(config Config) {
 	flag.Parse()
 
 	r := mux.NewRouter()
+
+	// Add custom routes as needed first - tie API specific middleware to routes or sub-routes
+	config.SetupRoutes(r)
+
 	// Setup core architecture handlers and routes
 	r.HandleFunc("/health", HealthCheckHandler)
-	// Add your routes as needed - tie API specific middleware to routes or sub-routes
-	config.SetupRoutes(r)
 
 	srv := &http.Server{
 		Addr: os.Getenv("PROCESS_LISTEN_ADDR"),
@@ -42,6 +44,7 @@ func StartHTTPListener(config Config) {
 		Handler:      r, // Pass our instance of gorilla/mux in.
 	}
 
+	log.Printf("API Listener started at: %v", os.Getenv("PROCESS_LISTEN_ADDR"))
 	// Run our server in a goroutine so that it doesn't block.
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {

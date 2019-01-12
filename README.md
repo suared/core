@@ -1,5 +1,5 @@
 # core
-Go Lang reusable code bits for private projects.  The intent here is to be a library for my projects or others' if they find the patterns helpful.
+Go Lang reusable code bits for private projects.  The intent here is to be a library for my projects or others' if they find the patterns helpful and not be an all encompassing framework to keep it simple/ use what you need only.
 
 ## Usage examples:
 
