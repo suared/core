@@ -21,6 +21,7 @@ test: | depcheck infratest apitest ziptest
 
 .PHONY: depcheck
 depcheck: 
+	#Uncomment before check in, while offline
 	go get -u
 
 #TODO: Change most of these to use stamps convention/ hidden files
