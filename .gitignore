@@ -29,6 +29,5 @@ ziptest
 bin
 **/bin
 
-# Test directories will generate files to be ignored
-test
-**/test
+# Test directories will generate files to be ignored, the test package here is real though so it removes that one item
+./**/test
