@@ -9,7 +9,9 @@ import (
 	"os/signal"
 	"time"
 
-	//Core setup
+	"github.com/suared/core/api/middleware"
+
+	//Core Config setup
 	_ "github.com/suared/core/infra"
 
 	"github.com/gorilla/mux"
@@ -28,6 +30,9 @@ func StartHTTPListener(config Config) {
 	flag.Parse()
 
 	r := mux.NewRouter()
+
+	//Add any middleware to be used
+	middleware.SetUpMiddleware(r)
 
 	// Add custom routes as needed first - tie API specific middleware to routes or sub-routes
 	config.SetupRoutes(r)

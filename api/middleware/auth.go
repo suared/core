@@ -1,42 +1,49 @@
 package middleware
 
-// TODO / FUTURE:  Placeholder - move this to use auth0 below: 
-// Use with this instead --> https://github.com/auth0/go-jwt-middleware
+import (
+	"net/http"
+	"os"
 
-//SAMPLE code from MUX on auth middleware setup
-// Define our struct
-type authenticationMiddleware struct {
-	tokenUsers map[string]string
+	"github.com/gorilla/mux"
+	"github.com/suared/core/security"
+
+	//Base infra setup for package
+	_ "github.com/suared/core/infra"
+)
+
+var isTest, isCognito bool
+
+func init() {
+	authStyle := os.Getenv("AUTH_STYLE")
+	if authStyle == "test" {
+		isTest = true
+	}
 }
 
-// Initialize it somewhere
-func (amw *authenticationMiddleware) Populate() {
-	amw.tokenUsers["00000000"] = "user0"
-	amw.tokenUsers["aaaaaaaa"] = "userA"
-	amw.tokenUsers["05f717e5"] = "randomUser"
-	amw.tokenUsers["deadbeef"] = "user0"
+//SetupAuth - Will enable authentication middleware if appropriate environment variables are set.
+//For now, will always setup and will add future flags when needed to support on/off + diff authentication styles
+//The assumption for all users as that this will setup the auth only, the determination of correct level of auth will be determined by the api functions themselves
+func SetupAuth(router *mux.Router) {
+
+	router.Use(authMiddleware)
 }
 
-// Middleware function, which will be called for each request
-func (amw *authenticationMiddleware) Middleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        token := r.Header.Get("X-Session-Token")
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//TODO:  Not yet reading from real token value, add testers in integration test of 2 different users to ensure this is fuly tested
+		// get current context from request
+		ctx := r.Context()
 
-        if user, found := amw.tokenUsers[token]; found {
-        	// We found the token in our map
-        	log.Printf("Authenticated user %s\n", user)
-        	// Pass down the request to the next middleware (or final handler)
-        	next.ServeHTTP(w, r)
-        } else {
-        	// Write an error and stop the handler chain
-        	http.Error(w, "Forbidden", http.StatusForbidden)
-        }
-    })
+		if isTest {
+			ctx = security.SetupTestAuthFromContext(ctx, 1)
+		} else if isCognito {
+			//token := r.Header.Get("X-Session-Token")
+			//translate values into user object
+			// ctx = security.SetupAuthFromContext(ctx...)
+		}
+		// update request with new context
+		r = r.WithContext(ctx)
+		// call the next handler inthe chain - clean up of context done by libraries so unneeded to add cleanup here...
+		next.ServeHTTP(w, r)
+	})
 }
-r := mux.NewRouter()
-r.HandleFunc("/", handler)
-
-amw := authenticationMiddleware{}
-amw.Populate()
-
-r.Use(amw.Middleware)
