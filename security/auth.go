@@ -51,7 +51,24 @@ func (t *BasicAuth) IsAdmin() bool {
 
 //GetAuth - returns Auth from the provided context
 func GetAuth(ctx context.Context) Auth {
-	return ctx.Value(authKey).(Auth)
+	authKey := ctx.Value(authKey)
+	if authKey == nil {
+		return nil
+	}
+	return authKey.(Auth)
+}
+
+//IsAnonymous - if security context is not set or user is empty or the string anonymousit  will return true/ not logged in
+func IsAnonymous(ctx context.Context) bool {
+	auth := GetAuth(ctx)
+	if auth == nil {
+		return true
+	}
+	username := auth.GetUser()
+	if username == "" || username == "anonymous" {
+		return true
+	}
+	return false
 }
 
 //SetupAuthFromHTTP - Enables Auth for later retrieval in the request flow, value added to returned Context
