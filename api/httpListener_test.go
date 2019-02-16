@@ -28,6 +28,10 @@ func (routes testRoutes) SetupRoutes(router *mux.Router) {
 	log.Println("Setting up http listener")
 }
 
+func (routes testRoutes) StartServer() bool {
+	return true
+}
+
 func init() {
 	//start listener
 	log.Println("Init called on listener test")
