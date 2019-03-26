@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"os"
 
@@ -17,6 +18,8 @@ func init() {
 	authStyle := os.Getenv("AUTH_STYLE")
 	if authStyle == "test" {
 		isTest = true
+	} else if authStyle == "cognito" {
+		isCognito = true
 	}
 }
 
@@ -40,6 +43,9 @@ func authMiddleware(next http.Handler) http.Handler {
 			//token := r.Header.Get("X-Session-Token")
 			//translate values into user object
 			// ctx = security.SetupAuthFromContext(ctx...)
+			//Will first report out all the headers to be sure it is set up correctly and will use the test auth
+			log.Printf("In Cognito check, hoping this has a pretty print of headers: %v", r.Header)
+			ctx = security.SetupTestAuthFromContext(ctx, 1)
 		}
 		// update request with new context
 		r = r.WithContext(ctx)
