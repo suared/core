@@ -14,10 +14,11 @@ clean:
 	rm -f infratest
 	rm -f apitest
 	rm -f ziptest
+	rm -f testtest
 	go mod tidy
 
 .PHONY: test
-test: | depcheck infratest apitest ziptest
+test: | depcheck infratest apitest ziptest testtest
 
 .PHONY: depcheck
 depcheck: 
@@ -35,6 +36,12 @@ apitest: api api/*.go
 	cd api && go test -cover -coverprofile=coverage.out
 	cd api && go vet
 	cd api && go tool cover -html=coverage.out
+	@touch $@
+
+testtest: test test/*.go
+	cd test && go test -cover -coverprofile=coverage.out
+	cd test && go vet
+	cd test && go tool cover -html=coverage.out
 	@touch $@
 
 ziptest: ziptools ziptools/*.go
