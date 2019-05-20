@@ -13,5 +13,9 @@ func SetUpMiddleware(router *mux.Router) {
 	//Future:  Placeholder middlewares in this package file names to be implemented
 	//Future:  Add access.log equiv?   Any resource clearing needed here that would not be covered at project level?
 	//leave to the middlewares to use environment variables to turn on/off/configure themsevles as needed vs. managing centrally
+
+	//TODO:  Make Cors part of config options vs. always
+	SetupCORS(router)
 	SetupAuth(router)
+
 }
