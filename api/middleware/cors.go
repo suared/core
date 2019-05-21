@@ -24,9 +24,14 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 		headers.Add("Vary", "Access-Control-Request-Method")
 		headers.Add("Vary", "Access-Control-Request-Headers")
 		headers.Set("Access-Control-Allow-Origin", "*")
-		headers.Set("Access-Control-Allow-Methods", "OPTIONS,POST,GET,PUT,DELETE")
+		headers.Set("Access-Control-Allow-Methods", "OPTIONS,POST,GET,PUT,DELETE,PATCH,HEAD")
 		headers.Set("Access-Control-Allow-Credentials", "true")
 		headers.Set("Access-Control-Allow-Headers", "Content-Type")
+		headers.Set("Access-Control-Max-Age", "3600")
+		headers.Set("X-Content-Type-Options", "nosniff")
+		headers.Set("X-Frame-Options", "SAMEORIGIN")
+		headers.Set("X-XSS-Protection", "1; mode=block")
+
 		//log.Printf("in pre-flight, returning")
 		return
 	}
