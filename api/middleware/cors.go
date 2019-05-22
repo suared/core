@@ -10,7 +10,9 @@ import (
 
 //SetupCORS - Eables CORS Middleware.  Presently usurping all Options requests (TODO:  Future Optional)
 func SetupCORS(router *mux.Router) {
-	//router.Use(corsMiddleware)
+	//For all other requests add in middleware
+	router.Use(corsMiddleware)
+	//For Options requests handle here
 	router.Methods("OPTIONS").HandlerFunc(preflightHandler)
 }
 
@@ -39,27 +41,10 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//NOT IN USE RIGHT NOW, ONLY USE RIGHT NOW IS FOR PRE_FLIGHT, FUTURE FIX>...
-/*func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//If Options pre-flight request, handle...
-		log.Printf("in pre-flight, method: %v, acess req: %v", r.Method, r.Header.Get("Access-Control-Request-Method"))
-
-		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-			headers := w.Header()
-			headers.Add("Vary", "Origin")
-			headers.Add("Vary", "Access-Control-Request-Method")
-			headers.Add("Vary", "Access-Control-Request-Headers")
-			headers.Set("Access-Control-Allow-Origin", "*")
-			headers.Set("Access-Control-Allow-Methods", "OPTIONS,POST,GET,PUT,DELETE")
-			headers.Set("Access-Control-Allow-Credentials", "true")
-			headers.Set("Access-Control-Allow-Headers", "Content-Type")
-			log.Printf("in pre-flight, returning")
-			return
-		}
-		//Go to the next handler in the chain only if not pre-flight
-		log.Printf("in pre-flight, skipping")
+		//Add in CORS headers to all request
+		preflightHandler(w, r)
 		next.ServeHTTP(w, r)
 	})
 }
-*/
