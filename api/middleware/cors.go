@@ -26,8 +26,8 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 		headers.Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 		headers.Set("Access-Control-Allow-Methods", "OPTIONS,POST,GET,PUT,DELETE,PATCH,HEAD")
 		headers.Set("Access-Control-Allow-Credentials", "true")
-		headers.Set("Access-Control-Allow-Headers", "Content-Length,Content-Type,Origin,Referer,User-Agent")
-		headers.Set("Access-Control-Expose-Headers", "Cache-Control,Content-Length,Content-Type,Date,ETag,Expires,Server,Vary")
+		headers.Set("Access-Control-Allow-Headers", "Content-Length,Content-Type,Origin,Referer,User-Agent,Origin,Access-Control-Request-Headers,Access-Control-Request-Method")
+		headers.Set("Access-Control-Expose-Headers", "Cache-Control,Content-Length,Content-Type,Date,ETag,Expires,Server,Vary,Access-Control-Allow-Origin,Access-Control-Allow-Methods,Access-Control-Allow-Credentials,Access-Control-Allow-Headers,Access-Control-Expose-Headers,Access-Control-Max-Age")
 		headers.Set("Access-Control-Max-Age", "3600")
 		//TODO:  Research these, move to separate middleware if appropriate
 		//headers.Set("X-Content-Type-Options", "nosniff")
