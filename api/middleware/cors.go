@@ -12,12 +12,14 @@ import (
 func SetupCORS(router *mux.Router) {
 	//For all other requests add in middleware
 	router.Use(corsMiddleware)
-	//For Options requests handle here
+	//For Options requests handle here - required, otherwise will not go through middleware if no handler
 	router.Methods("OPTIONS").HandlerFunc(preflightHandler)
 }
 
 func preflightHandler(w http.ResponseWriter, r *http.Request) {
 	//If Options pre-flight request, handle...
+	//If an Options request this is visited twice, once as the middleware for itself however the header doesn't dup and catching it for the odd scenarios seems not worth the effort right now
+
 	//log.Printf("in pre-flight, method: %v, acess req: %v", r.Method, r.Header.Get("Access-Control-Request-Method"))
 
 	if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
@@ -38,6 +40,11 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 
 		//log.Printf("in pre-flight, returning")
 		return
+	} else {
+		//Even for Get requests Chrome seems to block so adding the origin only here to work around
+		headers := w.Header()
+		headers.Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+
 	}
 }
 
