@@ -30,7 +30,7 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 		headers.Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 		headers.Set("Access-Control-Allow-Methods", "OPTIONS,POST,GET,PUT,DELETE,PATCH,HEAD")
 		headers.Set("Access-Control-Allow-Credentials", "true")
-		headers.Set("Access-Control-Allow-Headers", "Authorization,Origin,Referer,User-Agent")
+		headers.Set("Access-Control-Allow-Headers", "Authorization,Origin,Referer,User-Agent,Content-Type")
 		//headers.Set("Access-Control-Allow-Headers", "Location,Authorization,Content-Length,Content-Type,Origin,Referer,User-Agent,Origin,Access-Control-Request-Headers,Access-Control-Request-Method")
 		//headers.Set("Access-Control-Expose-Headers", "Location,Cache-Control,Content-Length,Content-Type,Date,ETag,Expires,Server,Access-Control-Allow-Origin,Access-Control-Allow-Methods,Access-Control-Allow-Credentials,Access-Control-Allow-Headers,Access-Control-Expose-Headers,Access-Control-Max-Age")
 		headers.Set("Access-Control-Expose-Headers", "Location")
