@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"log"
+	"encoding/json"
 	"net/http"
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/suared/core/errors"
 	"github.com/suared/core/security"
 
 	//Base infra setup for package
@@ -35,17 +36,25 @@ func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//TODO:  Not yet reading from real token value, add testers in integration test of 2 different users to ensure this is fuly tested
 		// get current context from request
+		var err error
 		ctx := r.Context()
 
 		if isTest {
 			ctx = security.SetupTestAuthFromContext(ctx, 1)
 		} else if isCognito {
-			//token := r.Header.Get("X-Session-Token")
-			//translate values into user object
-			// ctx = security.SetupAuthFromContext(ctx...)
-			//Will first report out all the headers to be sure it is set up correctly and will use the test auth
-			log.Printf("In Cognito check, hoping this has a pretty print of headers: %v", r.Header)
-			ctx = security.SetupTestAuthFromContext(ctx, 1)
+			//This is the scheme I am going to use for Cognito:
+			//Authorization: COGNITO id_token="<idJWT>", access_token="<accessJWT>"
+			//To start, only id_token will be used, this will just give me flex for future if needed
+			//ctx = security.SetupTestAuthFromContext(ctx, 1)
+			//token := r.Header.Get("X-AUTH-USER")
+			ctx, err = security.SetupAuthFromHTTP(r)
+			if err != nil {
+				coreerror := errors.NewClientError("Invalid Authorization Header Structure: " + err.Error()).(errors.Error)
+				//write error message
+				w.WriteHeader(coreerror.ErrorType)
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(coreerror)
+			}
 		}
 		// update request with new context
 		r = r.WithContext(ctx)

@@ -1,0 +1,15 @@
+package security
+
+import "testing"
+
+func TestJWT(t *testing.T) {
+	auth, err := validateJWT("eyJraWQiOiJOV3pPaWFxenp5enhDRmxJTDlXOFBORzQ0YXBObjBNTWJQSmcwNDVHdE5nPSIsImFsZyI6IlJTMjU2In0.eyJhdF9oYXNoIjoiMkUzYzhsclNqbTZ6aVVaYXNzV19rdyIsInN1YiI6ImJjMDE1N2U5LTM3YTItNDgxNi05ZTY0LTJjODg2ZDQwOGYwNyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAudXMtZWFzdC0xLmFtYXpvbmF3cy5jb21cL3VzLWVhc3QtMV9qUVJtU3p2SmciLCJjb2duaXRvOnVzZXJuYW1lIjoic3VhcmVkIiwiYXVkIjoiNnFwMHVtMWpwODNyYTZndm80ZGR2NjN2OGYiLCJldmVudF9pZCI6IjJmM2QzMGI2LTg0YmYtMTFlOS1hOTg2LTJmMGIwN2FjYjllOSIsInRva2VuX3VzZSI6ImlkIiwiYXV0aF90aW1lIjoxNTU5NDI5MjI3LCJuaWNrbmFtZSI6IkZpcnN0VGVzdFN1YXJleiIsImV4cCI6MTU1OTQzMjgyNywiaWF0IjoxNTU5NDI5MjI4LCJlbWFpbCI6ImRhdmlkQHN1YXJlemhvdXNlLm5ldCJ9.I9P1KtsJybbJ6zLU2xK35vzZRDz0wleDJtMvq4Sj7nzdRsGPFMUqi8U7UorlE-mHYvD63BQYMDa1gHGNuTra46oBV1fIBC7WidecN6PoLOHrcSK2gb-_t6o0THXENSYmNLrwo4z8GFuxKEnacY0B6E3YTA5Ir77VpNqoXFkw_UAzRutvvpiIRc7YrT3StkPR4v9h75vXVgXC3gbp95tX3RzD-xSV9rK_tA1sUwY7hwoANnhv2euUwBdciozWTGRFdhFnxvd7AIrRbcybEl4VgTkg5kUE9TdVJIxUMtAZ2CvubZ7W5wzexvU1ShlrE8_sbN-dTUlhcsfH2Ims9YcMOA")
+	if err != nil {
+		t.Errorf("failed with: %v", err)
+	}
+
+	if auth.GetUser() != "david@suarezhouse.net" {
+		t.Errorf("unexpected user, got: %v", auth.GetUser())
+	}
+	//add more validations here..
+}

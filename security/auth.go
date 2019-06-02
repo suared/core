@@ -3,8 +3,10 @@ package security
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"strings"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 var authKey key
@@ -71,11 +73,123 @@ func IsAnonymous(ctx context.Context) bool {
 	return false
 }
 
+type authHeaderStruct struct {
+	scheme   string
+	valueMap map[string]string
+	isScheme bool
+	isKey    bool
+	isVal    bool
+	lastKey  string
+}
+
+func (header *authHeaderStruct) Set(val string) {
+	if header.isScheme {
+		header.scheme = val
+		header.isKey = true
+		header.isScheme = false
+	}
+
+	if header.isKey {
+		header.lastKey = val
+		header.isKey = false
+		header.isVal = true
+	}
+
+	if header.isVal {
+		header.valueMap[header.lastKey] = val
+		header.isKey = true
+		header.isVal = false
+	}
+}
+
+//At present this is only good for one time use, assumes previous call is a newly initialized struct
+func (header *authHeaderStruct) setAuthString(val string) {
+	//Create slices, ignore back to back "space" characters when processing
+	authHeaderTokenizer := strings.NewReplacer("\"", "",
+		"=", " ",
+		",", " ",
+	)
+	authHeaderTokens := authHeaderTokenizer.Replace(val)
+	authHeaderSlice := strings.Split(authHeaderTokens, " ")
+	prev := " "
+	for i := range authHeaderSlice {
+		switch authHeaderSlice[i] {
+		case " ":
+			if prev == " " {
+				//ignore back to back tokens (spaces)
+			} else {
+				prev = authHeaderSlice[i]
+				header.Set(prev)
+			}
+		default:
+			prev = authHeaderSlice[i]
+			header.Set(prev)
+		}
+	}
+
+}
+func newAuthHeaderStruct(val string) *authHeaderStruct {
+	obj := authHeaderStruct{}
+	obj.isScheme = true
+	obj.valueMap = make(map[string]string)
+	retValue := &obj
+	retValue.setAuthString(val)
+	return retValue
+}
+
 //SetupAuthFromHTTP - Enables Auth for later retrieval in the request flow, value added to returned Context
-func SetupAuthFromHTTP(r *http.Request) context.Context {
-	log.Printf("setting up auth from http...")
+func SetupAuthFromHTTP(r *http.Request) (context.Context, error) {
+	//log.Printf("setting up auth from http...")
 	ctx := r.Context()
-	return context.WithValue(ctx, authKey, &BasicAuth{user: "suared"})
+	//r := strings.NewReplacer("<", "&lt;", ">", "&gt;")
+	//func Map(mapping func(rune) rune, s string) string
+	authHeader := r.Header.Get("Authorization")
+
+	if authHeader == "" {
+		return context.WithValue(ctx, authKey, &BasicAuth{user: "anonymous"}), nil
+	}
+
+	authHeaderStruct := newAuthHeaderStruct(authHeader)
+
+	//If Scheme is Cognito --> Authorization: COGNITO id_token="<idJWT>", access_token="<accessJWT>"
+	//only supported Scheme so far is Cognito so I am just falling through here for now till others exist
+	//Only support key is "id_token" so assumed for now
+	idToken := authHeaderStruct.valueMap["id_token"]
+	//validate jwt is still valid (signature check + expiration check); if not valid throw error
+	basicAuth, err := validateJWT(idToken)
+	if err != nil {
+		return ctx, fmt.Errorf("unable to validate JWT: %v", err)
+	}
+	//
+
+	return context.WithValue(ctx, authKey, basicAuth), nil
+}
+
+func validateJWT(tokenString string) (BasicAuth, error) {
+
+	//This only checks for AWS Cognito tokens right now, can expand it within later...
+	token, err := validateToken(tokenString)
+
+	if err != nil {
+		return BasicAuth{}, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return BasicAuth{}, fmt.Errorf("Claims type unexpected: %v", claims)
+	}
+
+	validatedEmail, ok := claims["email_verified"].(bool)
+	if !ok {
+		return BasicAuth{}, fmt.Errorf("ID Token expected with email verification, received: %v", validatedEmail)
+	}
+
+	if validatedEmail {
+		return BasicAuth{user: claims["email"].(string)}, nil
+	}
+
+	//non email validated users will be treated the same as anonymous users
+	return BasicAuth{user: "anoymous"}, nil
 }
 
 //SetupTestAuthFromContext - Enables Auth for later retrieval in the request flow, , value added to returned Context
