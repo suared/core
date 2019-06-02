@@ -2,6 +2,7 @@
 infratest
 apitest
 ziptest
+securitytest
 
 # Binaries for programs and plugins
 *.exe
@@ -32,3 +33,4 @@ bin
 # Test directories will generate files to be ignored, the test package here is real though so it removes that one item
 ./**/test
 testtest
+securitytest

@@ -83,22 +83,26 @@ type authHeaderStruct struct {
 }
 
 func (header *authHeaderStruct) Set(val string) {
+	//This is a stateful switch so returning after each block is required so only one case happens per turn
 	if header.isScheme {
 		header.scheme = val
 		header.isKey = true
 		header.isScheme = false
+		return
 	}
 
 	if header.isKey {
 		header.lastKey = val
 		header.isKey = false
 		header.isVal = true
+		return
 	}
 
 	if header.isVal {
 		header.valueMap[header.lastKey] = val
 		header.isKey = true
 		header.isVal = false
+		return
 	}
 }
 
@@ -114,13 +118,9 @@ func (header *authHeaderStruct) setAuthString(val string) {
 	prev := " "
 	for i := range authHeaderSlice {
 		switch authHeaderSlice[i] {
-		case " ":
-			if prev == " " {
-				//ignore back to back tokens (spaces)
-			} else {
-				prev = authHeaderSlice[i]
-				header.Set(prev)
-			}
+		case "":
+			//ignore spaces
+
 		default:
 			prev = authHeaderSlice[i]
 			header.Set(prev)
