@@ -162,7 +162,7 @@ func SetupAuthFromHTTP(r *http.Request) (context.Context, error) {
 	}
 	//
 
-	return context.WithValue(ctx, authKey, basicAuth), nil
+	return context.WithValue(ctx, authKey, &basicAuth), nil
 }
 
 func validateJWT(tokenString string) (BasicAuth, error) {
