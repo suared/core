@@ -56,7 +56,7 @@ func newDynamoSession(awsDynamoDBSession *awsDynamoDB.DynamoDB) *DynamoSession {
 	return dynSession
 }
 
-//ValidAction - Default Security check
+//ValidAction - Default Security check, called externally to enable swap outs
 func ValidAction(ctx context.Context, action string, dao DAO) error {
 	//Get authentication object
 	auth := security.GetAuth(ctx)

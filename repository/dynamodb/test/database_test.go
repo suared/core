@@ -14,10 +14,22 @@ import (
 	_ "github.com/suared/core/infra"
 )
 
-/*  Debugging:
+/*
+
+In addition to validating the library this provides and easy reference on the bits that need to be implemented by a caller and can be copy/pasted as a start with a specific model based on the use case
+
+Debugging:
 CLI Reference: https://docs.aws.amazon.com/cli/latest/reference/dynamodb/index.html#cli-aws-dynamodb
 Command Example:  aws dynamodb scan --table-name "testTable" --endpoint-url http://localhost:9001
 Other:  not done intentionally (yet) is to force insert/ update to use condition-expression attribute_exists or not exists as appropriate
+
+	//Flow:
+	//Typical:  Callers (Model) --> Repository -->  Internal DAO from Model -->  Database
+	//Responsibilities Arch:
+	//	* Callers(Model) - Callers In  (( above ))
+	//  * Repository - Definition is Caller, Implementation is library (( above for caller ))
+	//  * Internal DAO from Model - Implementation options is library, option selection is caller
+	//  * Database - library
 */
 
 //sample caller model
@@ -26,13 +38,13 @@ type TestModel struct {
 	Title string
 }
 
-//sample caller model wrapper for non-model adds (e.g. ui bits)
+//sample caller model wrapper for non-model adds (e.g. ui bits) to show it works with embedded structs
 type TestUserModel struct {
 	dummy string
 	TestModel
 }
 
-//sample repository model
+//sample repository model - what a caller would implement
 type TestRepository struct {
 	/*Required fields for dynamoDB implementation
 	backend     string
@@ -54,6 +66,8 @@ func (repo *TestRepository) Config() repository.Config {
 
 //TODO:  Create/Test active and audit options as well as zip conversion
 //sample DAO, the DAO requires to have the HashKey and SortKey fields mathing the names - how you do that is up to the DAO implementor.  In this example, the data is being duplicated vs. naming the fields to show a potential indirection path to allow growth
+
+//TestDAO - Caller would ipmlement the relevant DAO which would include the model to be saved along with any other key values (e.g. hash/sort for dynamo)
 type TestDAO struct {
 	UserID              string
 	MyCleverHashKeyName string
@@ -61,34 +75,40 @@ type TestDAO struct {
 	TestUserModel
 }
 
-//ok for testing, just setting each call, should build this in to a real dao and not constant reset
+//HashKey - This is the value that would be set as the dynamo hashkey
 func (dao *TestDAO) HashKey() string {
 	return dao.MyCleverHashKeyName
 }
 
+//SortKey - This is the value that would be set as the dynamo sortKey
 func (dao *TestDAO) SortKey() string {
 	return dao.MyCleverSortKeyName
 }
 
+//User - the user that made this call
 func (dao *TestDAO) User() string {
 	return dao.UserID
 }
 
+//New - creates a new instance of this specific type to support return values of the right type
 func (dao *TestDAO) New() dynamodb.DAO {
 	return new(TestDAO)
 }
 
+//Refresh - updates the Hashkey and SortKey.  Used by the library before calls
 func (dao *TestDAO) Refresh() {
 	dao.MyCleverHashKeyName = "TestTable_" + dao.UserID
 	dao.MyCleverSortKeyName = dao.ID
 }
 
+//NewTestDAO - Initializes this object with the user ID from context
 func NewTestDAO(ctx context.Context) *TestDAO {
 	dao := new(TestDAO)
 	dao.UserID = security.GetAuth(ctx).GetUser()
 	return dao
 }
 
+//DAO- Returns a DAO associated with this repository from a model object
 func (r *TestRepository) DAO(ctx context.Context, userModel TestUserModel, active bool, audit bool) (dynamodb.DAO, error) {
 	// Both "Un-Delete" and "Make Active" will be the exception to the rule so this will assume always from active pile and not deleted
 	// Special methods will be created for the special cases vs. adding complexity to the base case
@@ -99,6 +119,7 @@ func (r *TestRepository) DAO(ctx context.Context, userModel TestUserModel, activ
 	return dao, nil
 }
 
+//Insert - Sample of a basic insert method with validation
 func (r *TestRepository) Insert(ctx context.Context, userModel TestUserModel) error {
 	// Populate the Data object First //  active?, audit?
 	dao, err := r.DAO(ctx, userModel, false, false)
@@ -117,6 +138,7 @@ func (r *TestRepository) Insert(ctx context.Context, userModel TestUserModel) er
 	return dynamodb.InsertOrUpdate(ctx, r, dao)
 }
 
+//Update - Sample of updating a DB entry
 func (r *TestRepository) Update(ctx context.Context, userModel TestUserModel) error {
 	dao, err := r.DAO(ctx, userModel, false, false)
 	if err != nil {
@@ -133,6 +155,7 @@ func (r *TestRepository) Update(ctx context.Context, userModel TestUserModel) er
 
 }
 
+//Delete - Sample of deleting a DB entry
 func (r *TestRepository) Delete(ctx context.Context, template TestUserModel) error {
 	dao, err := r.DAO(ctx, template, false, false)
 	if err != nil {
@@ -143,6 +166,7 @@ func (r *TestRepository) Delete(ctx context.Context, template TestUserModel) err
 	return dynamodb.Delete(ctx, r, dao)
 }
 
+//Select - Sample of a get all by hashkey
 func (r *TestRepository) Select(ctx context.Context, template TestUserModel) ([]TestUserModel, error) {
 	dao, err := r.DAO(ctx, template, false, false)
 	if err != nil {
@@ -211,13 +235,17 @@ func (repo *TestRepository) SelectOne(ctx context.Context, template TestUserMode
 
 }
 
+//SetSession - enables the library to store/ reuse the session for efficiency vs. creating new on each call
 func (r *TestRepository) SetSession(session repository.Session) {
 	r.session = session
 }
+
+//Session - Returns the session associated with this repository
 func (r *TestRepository) Session() repository.Session {
 	return r.session
 }
 
+//NewRepository - Initializes a sample repository with config values set
 func NewRepository() *TestRepository {
 	testRepo := new(TestRepository)
 	configMap := repository.NewBasicConfig("mytestdnyamodb")
@@ -233,15 +261,8 @@ func NewRepository() *TestRepository {
 	return testRepo
 }
 
+//Validation of the library data lifecycle is here - only the above items are needed to setup for a specific caller
 func TestDBSetup(t *testing.T) {
-	//Flow:
-	//Typical:  Callers (Model) --> Repository -->  Internal DAO from Model -->  Database
-	//Responsibilities Arch:
-	//	* Callers(Model) - Callers In  (( above ))
-	//  * Repository - Definition is Caller, Implementation is library (( above for caller ))
-	//  * Internal DAO from Model - Implementation options is library, option selection is caller
-	//  * Database - library
-
 	//Create Test Context
 	ctx := context.TODO()
 	ctx = security.SetupTestAuthFromContext(ctx, 1)
