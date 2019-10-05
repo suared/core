@@ -40,9 +40,17 @@ func loadEnvironmentVariables() {
 	dir, _ := os.Getwd()
 
 	//as soon as a .env file is found, the env base dir search will stop
-	//Give up if have tried this for up to 2 previous directories, note that accidental .env will impact this so will both a) log and b) exit with a panic depending on the situation
+	//Give up if have tried this for up to 4 previous directories, note that accidental .env will impact this so will both a) log and b) exit with a panic depending on the situation
 
 	newdir, found := checkForEnvFile(dir)
+	if !found {
+		newdir, found = checkForEnvFile(newdir)
+	}
+
+	if !found {
+		newdir, found = checkForEnvFile(newdir)
+	}
+
 	if !found {
 		newdir, found = checkForEnvFile(newdir)
 	}
