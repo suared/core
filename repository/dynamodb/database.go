@@ -319,10 +319,18 @@ func SelectOne(ctx context.Context, repo repository.Repository, templ DAO) (DAO,
 		//log.Printf("output list: %v", outputList)
 	}
 
-	if len(daoResultList) > 1 {
+	resultsLen := len(daoResultList)
+	//If Select One results in more than one result, error vs. respond with the found item
+	if resultsLen > 1 {
 		return nil, errors.New("Received more than 1 result, expected 1.  Fix the base query")
 	}
 
+	//If Select One returns zero results, return the dao template vs. nil so the repository can handle it
+	if resultsLen == 0 {
+		return templ.New(), nil
+	}
+
+	//Otherwise return the found item
 	return daoResultList[0], nil
 
 }
