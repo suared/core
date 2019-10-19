@@ -3,6 +3,8 @@ package ziptools
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -65,4 +67,18 @@ func GetGunzipData(writer io.Writer, data []byte) error {
 	}
 	writer.Write(unzippeddata)
 	return nil
+}
+
+//GetGzipDataFromStruct - convenience method for structs that can use the default json Marshal method.  Panics if cannot convert
+func GetGzipDataFromStruct(theStruct interface{}) []byte {
+	var buf bytes.Buffer
+	data, err := json.Marshal(theStruct)
+	if err != nil {
+		panic(fmt.Errorf("Unable to marshal object: %v, in GetGzipDataFromStruct method, received: %v", theStruct, err))
+	}
+	err = GetGzipData(&buf, data)
+	if err != nil {
+		panic(fmt.Errorf("Unable to zip object: %v, in GetGzipDataFromStruct method, received: %v", theStruct, err))
+	}
+	return buf.Bytes()
 }

@@ -28,6 +28,8 @@ type DAO interface {
 	New() DAO
 	//Refresh - Updates the Hash/SortKey based on current values
 	Refresh()
+	//Populate - Called after a DAO has been mapped to the underlying db to support any additional actions.  Example:  calculated fields and decompressing
+	Populate()
 }
 
 // DaoAudit - INTERNAL ONLY.  Groups Audit data, exported to support default JSON conversion.
@@ -261,6 +263,7 @@ func Select(ctx context.Context, repo repository.Repository, templ DAO) ([]DAO, 
 		}
 
 		resultDAO.Refresh()
+		resultDAO.Populate()
 
 		daoResultList = append(daoResultList, resultDAO)
 
@@ -314,6 +317,7 @@ func SelectOne(ctx context.Context, repo repository.Repository, templ DAO) (DAO,
 		}
 
 		resultDAO.Refresh()
+		resultDAO.Populate()
 		daoResultList = append(daoResultList, resultDAO)
 
 		//log.Printf("output list: %v", outputList)
