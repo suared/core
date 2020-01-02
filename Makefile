@@ -24,7 +24,7 @@ test: | depcheck infratest apitest ziptest testtest securitytest
 .PHONY: depcheck
 depcheck: 
 	#Uncomment before check in, while offline
-	go get -u
+	#go get -u #Not required with go mod
 
 #TODO: Change most of these to use stamps convention/ hidden files
 infratest: infra infra/*.go

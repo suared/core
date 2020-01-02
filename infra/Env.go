@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/joho/godotenv"
+	coreErrors "github.com/suared/core/errors"
 )
 
 //Go treats these as singleton so do not need to code singleton manually here
@@ -14,6 +15,8 @@ func init() {
 	//fmt.Println("This will get called on main initialization only")
 	setEnvironmentVariables()
 	loadEnvironmentVariables()
+
+	setupErrorEventing()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -108,5 +111,12 @@ func checkForEnvFile(dir string) (string, bool) {
 	} else {
 		//	log.Println(".env not found")
 		return filepath.Join(dir, ".."), false
+	}
+}
+
+// To start, only checking and setting up Sentry - can change later as best
+func setupErrorEventing() {
+	if os.Getenv("ERROR_EVENTING") == "true" {
+		coreErrors.SetupEventing()
 	}
 }
