@@ -1,7 +1,10 @@
 package errors
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"time"
 )
 
 //Will use http status codes for simplicity though errors can come from server or api tier.  Each selected error is easily understandable in both contexts
@@ -80,4 +83,16 @@ func NewError(err error) Error {
 		UserMessage:      "Oops!  Unexpected data and actions, please try a different change"}
 	exceptionEvent(theErr)
 	return theErr
+}
+
+//LastResortHandler - Setup at start of program to capture panics not solved elsewhere to enable logging prior to program close down
+func LastResortHandler() {
+	if r := recover(); r != nil {
+		log.Printf("LastResort: panic=%v", r)
+		exceptionEvent(fmt.Errorf("panic:%v", r))
+		//If panicking, need to wait to be sure flush of events clears prior to program close
+		if isEventing {
+			time.Sleep(flushDuration() + time.Duration(time.Second*2))
+		}
+	}
 }
