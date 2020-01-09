@@ -25,7 +25,7 @@ import (
 //WriteGetAPIResponse - writes GET responses
 func WriteGetAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, jsonResponse interface{}, err error) {
 	if err != nil {
-		coreerror := getCoreError(err)
+		coreerror := getCoreError(ctx, err)
 		//write error message
 		w.WriteHeader(coreerror.ErrorType)
 		w.Header().Set("Content-Type", "application/json")
@@ -39,7 +39,7 @@ func WriteGetAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Req
 //WritePostAPIResponse - writes POST responses
 func WritePostAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, resourceLocation string, err error) {
 	if err != nil {
-		coreerror := getCoreError(err)
+		coreerror := getCoreError(ctx, err)
 		//write error message
 		w.WriteHeader(coreerror.ErrorType)
 		w.Header().Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func WritePostAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Re
 //WritePutAPIResponse - writes PUT responses
 func WritePutAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 	if err != nil {
-		coreerror := getCoreError(err)
+		coreerror := getCoreError(ctx, err)
 		//write error message
 		w.WriteHeader(coreerror.ErrorType)
 		w.Header().Set("Content-Type", "application/json")
@@ -66,7 +66,7 @@ func WritePutAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Req
 //WritePatchAPIResponse - writes Patch responses
 func WritePatchAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 	if err != nil {
-		coreerror := getCoreError(err)
+		coreerror := getCoreError(ctx, err)
 		//write error message
 		w.WriteHeader(coreerror.ErrorType)
 		w.Header().Set("Content-Type", "application/json")
@@ -79,7 +79,7 @@ func WritePatchAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.R
 //WriteDeleteAPIResponse - writes Delete responses
 func WriteDeleteAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
 	if err != nil {
-		coreerror := getCoreError(err)
+		coreerror := getCoreError(ctx, err)
 		//write error message
 		w.WriteHeader(coreerror.ErrorType)
 		w.Header().Set("Content-Type", "application/json")
@@ -89,12 +89,12 @@ func WriteDeleteAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.
 	}
 }
 
-func getCoreError(err error) coreerrors.Error {
+func getCoreError(ctx context.Context, err error) coreerrors.Error {
 	coreType, ok := err.(coreerrors.Error)
 	if ok {
 		return coreType
 	} else {
-		coreErr := coreerrors.NewError(err)
+		coreErr := coreerrors.NewError(ctx, err)
 		return coreErr
 	}
 }

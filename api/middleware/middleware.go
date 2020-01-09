@@ -17,5 +17,6 @@ func SetUpMiddleware(router *mux.Router) {
 	//TODO:  Make Cors part of config options vs. always
 	SetupCORS(router)
 	SetupAuth(router)
+	SetupErrorHandler(router)
 
 }

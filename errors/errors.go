@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -68,31 +69,36 @@ func NewClientError(err string) error {
 }
 
 //NewSystemError - returns a default InternalServerError denoting an implementation issue
-func NewSystemError(err string) error {
+func NewSystemError(ctx context.Context, err string) error {
 	theErr := Error{ErrorType: StatusInternalServerError,
 		DeveloperMessage: err}
-	exceptionEvent(theErr)
+	exceptionEvent(ctx, theErr)
 	return theErr
 }
 
 //NewError - returns a full core error struct from the default error type.  Type defafults to server error
 //Because this takes an error, the assumption is the underlying type is preferred to minimize type conversions in calling code
-func NewError(err error) Error {
+func NewError(ctx context.Context, err error) Error {
 	theErr := Error{ErrorType: StatusInternalServerError,
 		DeveloperMessage: err.Error(),
 		UserMessage:      "Oops!  Unexpected data and actions, please try a different change"}
-	exceptionEvent(theErr)
+	exceptionEvent(ctx, theErr)
 	return theErr
 }
 
 //LastResortHandler - Setup at start of program to capture panics not solved elsewhere to enable logging prior to program close down
-func LastResortHandler() {
+func LastResortHandler(loc string) {
+	LastResortHandlerWithContext(nil, loc)
+}
+
+//LastResortHandlerWithContext - Setup at start of program to capture panics not solved elsewhere to enable logging prior to program close down
+func LastResortHandlerWithContext(ctx context.Context, loc string) {
 	if r := recover(); r != nil {
 		log.Printf("LastResort: panic=%v", r)
-		exceptionEvent(fmt.Errorf("panic:%v", r))
+		exceptionEvent(ctx, fmt.Errorf("LastResort:%v, panic:%v", loc, r))
 		//If panicking, need to wait to be sure flush of events clears prior to program close
 		if isEventing {
-			time.Sleep(flushDuration() + time.Duration(time.Second*2))
+			time.Sleep(flushDuration() + time.Duration(time.Second*1))
 		}
 	}
 }

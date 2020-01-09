@@ -1,6 +1,8 @@
 package errors
 
 import (
+	"context"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -43,11 +45,13 @@ func SetupEventing() {
 		Environment:      os.Getenv("PROCESS_ENV"),
 		AttachStacktrace: sendStackTrace,
 	})
-	sentry.Flush(flushDuration())
+	flushLen := flushDuration()
+	sentry.Flush(flushLen)
+	log.Printf("Sentry configured: URI: %v, flushDuration: %v", uri, flushLen)
 }
 
 //exceptionEvent - Adds exception event if eventing is configured
-func exceptionEvent(err error) {
+func exceptionEvent(ctx context.Context, err error) {
 	if isEventing {
 		sentry.CaptureException(err)
 	}
