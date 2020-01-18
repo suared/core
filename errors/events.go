@@ -2,10 +2,13 @@ package errors
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/suared/core/security"
 
 	sentry "github.com/getsentry/sentry-go"
 )
@@ -53,6 +56,6 @@ func SetupEventing() {
 //exceptionEvent - Adds exception event if eventing is configured
 func exceptionEvent(ctx context.Context, err error) {
 	if isEventing {
-		sentry.CaptureException(err)
+		sentry.CaptureException(fmt.Errorf("Auth:%v; Error:%v", security.GetAuth(ctx), err))
 	}
 }
