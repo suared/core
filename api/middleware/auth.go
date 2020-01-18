@@ -54,6 +54,7 @@ func authMiddleware(next http.Handler) http.Handler {
 				w.WriteHeader(coreerror.ErrorType)
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(coreerror)
+				return
 			}
 		}
 		// update request with new context
