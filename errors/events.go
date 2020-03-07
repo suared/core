@@ -20,7 +20,7 @@ func flushDuration() time.Duration {
 	flushSeconds := time.Second * 5
 	flushInterval := os.Getenv("ERROR_EVENTING_FLUSH_SECS")
 	flushTest, err := strconv.Atoi(flushInterval)
-	if err != nil && flushTest != 0 {
+	if err == nil && flushTest != 0 {
 		flushSeconds = (time.Second * time.Duration(flushTest))
 	}
 	return flushSeconds
