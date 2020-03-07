@@ -62,14 +62,14 @@ func loadEnvironmentVariables() {
 		panic("Env Setup: Unable to find environment variable file from base: " + dir)
 	}
 
-	//Intentional startup print
-	fmt.Println("environment directory is " + newdir)
-
 	//Start processing environment files using the standard logic
 	env := os.Getenv("PROCESS_ENV")
 	if "" == env || env == "dev" {
 		env = "development"
 	}
+
+	//Intentional startup print
+	fmt.Printf("Loading env: %v, environment directory is %v", env, newdir)
 
 	godotenv.Load(filepath.Join(newdir, ".env."+env+".local"))
 
