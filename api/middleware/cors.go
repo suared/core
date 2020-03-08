@@ -40,8 +40,6 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 		//headers.Set("X-Frame-Options", "SAMEORIGIN")
 		//headers.Set("X-XSS-Protection", "1; mode=block")
 
-		//log.Printf("in pre-flight, returning")
-		return
 	} else {
 		//Even for Get requests Chrome seems to block so adding the origin only here to work around
 		headers := w.Header()
@@ -54,6 +52,13 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//Add in CORS headers to all request
 		preflightHandler(w, r)
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(200)
+			// no need to check auth, etc for options requests
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
