@@ -31,6 +31,10 @@ func WriteGetAPIResponse(ctx context.Context, w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(coreerror)
 	} else {
+		if jsonResponse == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(jsonResponse)
 	}
