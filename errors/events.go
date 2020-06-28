@@ -63,5 +63,5 @@ func exceptionEvent(ctx context.Context, err error) {
 //WriteDeveloperEvent - Sends message to sentry to enable a developer to pick up and fix a known issue where auto-fix is not yet known
 //To be used when client should not receive error however developer MUST fix it to restore full client functionality
 func WriteDeveloperEvent(ctx context.Context, msg string) {
-	sentry.CaptureMessage(msg)
+	sentry.CaptureMessage(fmt.Sprintf("Auth:%v, Message:%v", security.GetAuth(ctx), msg))
 }
