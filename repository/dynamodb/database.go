@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -226,21 +227,61 @@ func InsertOrUpdate(ctx context.Context, repo repository.Repository, dao DAO) er
 }
 
 //Select - Returns a list of DAO objects matching the template hashKey.  Validation is expected to be done by the caller
-func Select(ctx context.Context, repo repository.Repository, templ DAO) ([]DAO, error) {
+//Optionally a vararg of string with the form of:
+//  str1 = A DynamoDB Filter Expression
+//  str2 = The column variable, followed by A Type followed by a value delimited by ":"
+//  For multiples of above, the "AND" keyword is automatically appended.
+//  Type should be S: or N: for now, will add others as the need arises.  OR is not supported, would add a separate method if needed in the future
+//example:
+//Select(ctx, repo, dao, "contains(Color, :c", "c:S:Red")
+//The c variable is replaced with the string Red at runtime
+func Select(ctx context.Context, repo repository.Repository, templ DAO, strFilterVals ...string) ([]DAO, error) {
+	var filterExpr string
+	var input *awsDynamoDB.QueryInput
+
 	templ.Refresh()
 
 	hashKey := templ.HashKey()
 
-	input := &awsDynamoDB.QueryInput{
-		ExpressionAttributeValues: map[string]*awsDynamoDB.AttributeValue{
-			":column": {
-				S: aws.String(hashKey),
-			},
-		},
-		//"UserActive = :column"
-		KeyConditionExpression: aws.String(repo.Config().Values()["hashKeyName"] + " = :column"),
-		// not needed here, this is to set specific columns to return, example for ony GUID:	ProjectionExpression:   aws.String("GUID"),
-		TableName: aws.String(repo.Config().Values()["table"]),
+	//First Load the HashKey generic attribute
+	attrs := make(map[string]*awsDynamoDB.AttributeValue)
+	attrs[":column"] = &awsDynamoDB.AttributeValue{S: aws.String(hashKey)}
+
+	if strFilterVals != nil {
+		countAttrs := len(strFilterVals) / 2
+		for i := 0; i < countAttrs*2; i = i + 2 {
+			//Add the Filter Expression - the first attribute
+			if i == 0 {
+				filterExpr = strFilterVals[i]
+			} else {
+				filterExpr = filterExpr + " AND " + strFilterVals[i]
+			}
+
+			//Add the Value Attribute Expression
+			valueExpr := strings.Split(strFilterVals[i+1], ":")
+			if valueExpr[1] == "S" {
+				attrs[":"+valueExpr[0]] = &awsDynamoDB.AttributeValue{S: aws.String(valueExpr[2])}
+			}
+			if valueExpr[1] == "N" {
+				attrs[":"+valueExpr[0]] = &awsDynamoDB.AttributeValue{N: aws.String(valueExpr[2])}
+			}
+		}
+
+	}
+
+	if filterExpr == "" {
+		input = &awsDynamoDB.QueryInput{
+			ExpressionAttributeValues: attrs,
+			KeyConditionExpression:    aws.String(repo.Config().Values()["hashKeyName"] + " = :column"),
+			TableName:                 aws.String(repo.Config().Values()["table"]),
+		}
+	} else {
+		input = &awsDynamoDB.QueryInput{
+			ExpressionAttributeValues: attrs,
+			FilterExpression:          aws.String(filterExpr),
+			KeyConditionExpression:    aws.String(repo.Config().Values()["hashKeyName"] + " = :column"),
+			TableName:                 aws.String(repo.Config().Values()["table"]),
+		}
 	}
 
 	dbSession := repo.Session().(*DynamoSession).session

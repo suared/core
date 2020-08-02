@@ -101,6 +101,10 @@ func (dao *TestDAO) Refresh() {
 	dao.MyCleverSortKeyName = dao.ID
 }
 
+//Populate - For any additional actions, e.g. calculated columns, zip/unzip, etc
+func (dao *TestDAO) Populate() {
+}
+
 //NewTestDAO - Initializes this object with the user ID from context
 func NewTestDAO(ctx context.Context) *TestDAO {
 	dao := new(TestDAO)
@@ -167,14 +171,14 @@ func (r *TestRepository) Delete(ctx context.Context, template TestUserModel) err
 }
 
 //Select - Sample of a get all by hashkey
-func (r *TestRepository) Select(ctx context.Context, template TestUserModel) ([]TestUserModel, error) {
+func (r *TestRepository) Select(ctx context.Context, template TestUserModel, strFilterVals ...string) ([]TestUserModel, error) {
 	dao, err := r.DAO(ctx, template, false, false)
 	if err != nil {
 		log.Printf("Unable to Select, error getting DAO, err: %v", err)
 		return nil, err
 	}
 
-	result, err := dynamodb.Select(ctx, r, dao)
+	result, err := dynamodb.Select(ctx, r, dao, strFilterVals...)
 
 	var outputList []TestUserModel
 	//since the search is for user, validation only needs to occur on one item..
@@ -335,6 +339,17 @@ func TestDBSetup(t *testing.T) {
 
 	if len(valObjects) != 2 {
 		t.Errorf("Expected 2 return value in query, received: %v", len(valObjects))
+	}
+
+	//Use Select All to filter down to 1 value
+	valObjects, err = dynamoDBRepo.Select(ctx, queryModel2, "Title = :title", "title:S:2nd Item in table")
+
+	if err != nil {
+		t.Errorf("Select: Unable to query value, received err: %v", err)
+	}
+
+	if len(valObjects) != 1 {
+		t.Errorf("Expected 1 return value in query, received: %v", len(valObjects))
 	}
 
 	//Test update
