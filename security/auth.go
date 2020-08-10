@@ -27,6 +27,7 @@ func init() {
 //Auth - Interface for setting up and retrieving authentication data
 type Auth interface {
 	GetUser() string
+	GetAuthHeader() string
 	IsAdmin() bool
 }
 
@@ -34,6 +35,8 @@ type Auth interface {
 type BasicAuth struct {
 	user    string
 	isAdmin bool
+	//authHeader - for passing user context forward
+	authHeader string
 }
 
 func (t *BasicAuth) String() string {
@@ -49,6 +52,11 @@ func (t *BasicAuth) GetUser() string {
 //TODO: this always will be false till implemented
 func (t *BasicAuth) IsAdmin() bool {
 	return t.isAdmin
+}
+
+//GetAuthHeader - returns the Authorization Header associated with this request if http request
+func (t *BasicAuth) GetAuthHeader() string {
+	return t.authHeader
 }
 
 //GetAuth - returns Auth from the provided context
@@ -160,7 +168,8 @@ func SetupAuthFromHTTP(r *http.Request) (context.Context, error) {
 	if err != nil {
 		return ctx, fmt.Errorf("unable to validate JWT: %v", err)
 	}
-	//
+
+	basicAuth.authHeader = authHeader
 
 	return context.WithValue(ctx, authKey, &basicAuth), nil
 }
