@@ -7,5 +7,6 @@ require (
 	github.com/gorilla/mux v1.7.3
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 	github.com/joho/godotenv v1.3.0
+	github.com/rs/zerolog v1.23.0
 	github.com/segmentio/ksuid v1.0.2
 )
