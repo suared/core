@@ -61,6 +61,9 @@ func (t *BasicAuth) GetAuthHeader() string {
 
 //GetAuth - returns Auth from the provided context
 func GetAuth(ctx context.Context) Auth {
+	if ctx == nil {
+		return nil
+	}
 	authKey := ctx.Value(authKey)
 	if authKey == nil {
 		return nil

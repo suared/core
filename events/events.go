@@ -1,9 +1,11 @@
 package events
 
 import (
+	"context"
 	"os"
 
 	"github.com/rs/zerolog"
+	"github.com/suared/core/security"
 	"github.com/suared/core/types"
 )
 
@@ -20,12 +22,17 @@ func init() {
 
 //Debug write debug message to stdout
 //Using Loc as user provided to enable flex on how to define - e.g. domain.method or unique identifier, etc as makes sense.  Will ensure it is always thought about to start
-func Debug(loc string, msg string, keyVals ...types.KeyVal) {
+func Debug(ctx context.Context, loc string, msg string, keyVals ...types.KeyVal) {
+	auth := security.GetAuth(ctx)
+	userID := ""
+	if auth != nil {
+		userID = auth.GetUser()
+	}
 	if keyVals == nil {
-		debugLogger.Log().Str("loc", loc).Msg(msg)
+		debugLogger.Log().Str("loc", loc).Str("userID", userID).Msg(msg)
 	} else {
 		//dictionary, string, int, float
-		logger := debugLogger.Log().Str("loc", loc)
+		logger := debugLogger.Log().Str("loc", loc).Str("userID", userID)
 		for _, keyVal := range keyVals {
 			switch keyVal.Typ {
 			case types.TYPESTRING:
@@ -44,12 +51,17 @@ func Debug(loc string, msg string, keyVals ...types.KeyVal) {
 
 //Event write event message to stdout - note: events are handled outside the scope of the module by design
 //See debug comments, same concept here, is just marked as event to enable later processing of event stream
-func Event(loc string, msg string, keyVals ...types.KeyVal) {
+func Event(ctx context.Context, loc string, msg string, keyVals ...types.KeyVal) {
+	auth := security.GetAuth(ctx)
+	userID := ""
+	if auth != nil {
+		userID = auth.GetUser()
+	}
 	if keyVals == nil {
-		eventLogger.Log().Str("loc", loc).Msg(msg)
+		eventLogger.Log().Str("loc", loc).Str("userID", userID).Msg(msg)
 	} else {
 		//dictionary, string, int, float
-		logger := eventLogger.Log().Str("loc", loc)
+		logger := eventLogger.Log().Str("loc", loc).Str("userID", userID)
 		for _, keyVal := range keyVals {
 			switch keyVal.Typ {
 			case types.TYPESTRING:
