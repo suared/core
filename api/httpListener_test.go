@@ -33,11 +33,7 @@ func (routes testRoutes) StartServer() bool {
 }
 
 func init() {
-	//start listener
 	log.Println("Init called on listener test")
-	go StartHTTPListener(testRoutes{})
-	// TODO: listen to startup vs. assuming like below, this will work for now
-	time.Sleep(1 * time.Second)
 	//set local http client for validation
 	httpClient = &http.Client{}
 }
@@ -46,6 +42,9 @@ func init() {
 
 //TestHealthCheck - Validates healthcheck was setup as expected (validates default host/port as side effect)
 func TestHealthCheck(t *testing.T) {
+	go StartHTTPListener(testRoutes{})
+	// TODO: listen to startup vs. assuming like below, this will work for now
+	time.Sleep(1 * time.Second)
 	//Setting as real integration style client vs. unit test style in mux example
 	resp, err := httpClient.Get(os.Getenv("PROCESS_LISTEN_URI") + "/health")
 	if err != nil {

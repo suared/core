@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
@@ -27,7 +28,7 @@ func SimpleGet(uri string) (string, error) {
 
 	// Check the status code is what we expect.
 	if status := resp.StatusCode; status != http.StatusOK {
-		err = errors.New(string(status) + ": " + stringbody + ": accessing: " + uri)
+		err = errors.New(fmt.Sprint(status) + ": " + stringbody + ": accessing: " + uri)
 	}
 
 	return stringbody, err
@@ -51,13 +52,13 @@ func SimplePost(uri string, jsonBytes []byte) (string, error) {
 
 	// Check the status code is what we expect.
 	if status := resp.StatusCode; status != http.StatusOK {
-		err = errors.New(string(status) + ":" + stringbody)
+		err = errors.New(fmt.Sprint(status) + ":" + stringbody)
 		return "", err
 	}
 
 	if len(locationArray) == 0 {
 		//log.Printf("Fell into location header miss error, locArray: %v, len: %v", locationArray, len(locationArray))
-		err = errors.New(stringbody + ": No or Unexpected Location Header.  Location header length: " + string(len(locationArray)))
+		err = errors.New(stringbody + ": No or Unexpected Location Header.  Location header length: " + fmt.Sprint(len(locationArray)))
 		return "", err
 	}
 
