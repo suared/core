@@ -1,6 +1,6 @@
 module github.com/suared/core
 
-go 1.16
+go 1.18
 
 require (
 	github.com/aws/aws-sdk-go v1.23.17
@@ -12,3 +12,5 @@ require (
 	github.com/rs/zerolog v1.23.0
 	github.com/segmentio/ksuid v1.0.2
 )
+
+require github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
