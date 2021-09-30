@@ -7,4 +7,8 @@
 # aws dynamodb list-tables --endpoint-url http://localhost:8000
 
 #Run from Ubuntu w/ Docker, note: VBox port forwarding setup for this port
-docker run -p 9001:9001 -it --rm amazon/dynamodb-local -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar -port 9001 -inMemory -delayTransientStatuses
+#docker run -p 9001:9001 -it --rm amazon/dynamodb-local -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar -port 9001 -inMemory -delayTransientStatuses
+
+#Use built in jar as docker image does not support raspian naturally
+BASEDIR=$(dirname $0)
+java -Djava.library.path=$BASEDIR/../bin/DynamoDBLocal_lib -jar $BASEDIR/../bin/DynamoDBLocal.jar -port 9001 -inMemory -delayTransientStatuses
