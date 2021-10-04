@@ -11,13 +11,14 @@ import (
 
 var debugLogger zerolog.Logger
 var eventLogger zerolog.Logger
+var environment string //Pull from PROCESS_ENV environment variable
 
 func init() {
+	environment = os.Getenv("PROCESS_ENV")
 	//For Developer Output, not intended to be removed, create new method/level if have temp only need but try to avoid to extent possible outside dev env
-	debugLogger = zerolog.New(os.Stderr).With().Timestamp().Str("type", "MSG").Str("level", "DEBUG").Logger()
+	debugLogger = zerolog.New(os.Stderr).With().Timestamp().Str("type", "MSG").Str("level", "DEBUG").Str("env", environment).Logger()
 	//Events to integrate into event processes
-	eventLogger = zerolog.New(os.Stderr).With().Timestamp().Str("type", "EVENT").Str("level", "EVENT").Logger()
-
+	eventLogger = zerolog.New(os.Stderr).With().Timestamp().Str("type", "EVENT").Str("env", environment).Logger()
 }
 
 //Debug write debug message to stdout
@@ -51,6 +52,9 @@ func Debug(ctx context.Context, loc string, msg string, keyVals ...types.KeyVal)
 
 //Event write event message to stdout - note: events are handled outside the scope of the module by design
 //See debug comments, same concept here, is just marked as event to enable later processing of event stream
+//<domain>-<event>:  have event in the topic name so that listeners can focus on the key events interested in
+//Ex:  ops-log, task-complete, task-create, task-skip, etc…
+
 func Event(ctx context.Context, loc string, msg string, keyVals ...types.KeyVal) {
 	auth := security.GetAuth(ctx)
 	userID := ""
