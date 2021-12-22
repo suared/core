@@ -1,22 +1,22 @@
 package queue
 
 import (
+	"fmt"
 )
 
-//Making these public structs for future flexibility and marking as private which may end up not being smart/ better to expose as needed but...
-
-//Queue - should not be used directly, use StartQueue
+//Starting as private instead and will open up if needed later
+//queue - should not be used directly, use StartQueue
 //example: personQ := StartQueue(Person{}, processPerson, 3)
-type Queue [ msgType any ] struct {
+type queue [ msgType any ] struct {
 	channel chan msgType
 }
 //Send - Use the return from StartQueue to call send
 //example: personQ.Send(Person{Name: "David", Age: 5})
-func(q *Queue[msgType]) Send(msg msgType) {
+func(q *queue[msgType]) Send(msg msgType) {
 	q.channel <- msg
 }
 //Start - should not be used directly, use StartQueue instead
-func(q *Queue[msgType]) Start(fx func(msgType)) {
+func(q *queue[msgType]) start(fx func(msgType)) {
 	for item := range q.channel {
 		fx(item)
 	}
@@ -30,15 +30,16 @@ func(q *Queue[msgType]) Start(fx func(msgType)) {
 //The function run to process the messages is the function passed, in this case processPerson
 //The buffer size shoud be 1 or greater to enable a buffered channel using standard Go channel semantics
 //While "theType" is not used directly, user level code makes more sense this way to not escape the generics semantics outside of the library
-func StartQueue[T any] (theType T, fx func(T), buffer int) (*Queue[T]) {
+func StartQueue[T any] (theType T, fx func(T), buffer int) (*queue[T]) {
 
+	fmt.Println("change test")
 	//Make a channel of the right type
 	channel := make(chan T, buffer)
-	q := &Queue[T]{}
+	q := &queue[T]{}
 	q.channel = channel
 
 	//Start a processor - simple queue, 1 receiver only
-	go q.Start(fx)
+	go q.start(fx)
 	
 	//Build a return to enable sends 
 	return q
