@@ -13,4 +13,7 @@ require (
 	github.com/segmentio/ksuid v1.0.2
 )
 
-require github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+require (
+	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+	golang.org/dl v0.0.0-20220131190855-70de1b897271 // indirect
+)

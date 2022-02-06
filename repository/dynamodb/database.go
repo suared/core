@@ -25,6 +25,11 @@ type DAO interface {
 	HashKey() string
 	SortKey() string
 	User() string
+	SetUser(context.Context)
+	//Setup - called to setup the DAO from the UserModel data, must be casted for now in the local DAO
+	Setup(userModel interface{})
+	//GetModel - called to retrieve the UserModel from which this DAO was created
+	GetModel() interface{}
 	//New - Enables a copy of the specific struct to support return values
 	New() DAO
 	//Refresh - Updates the Hash/SortKey based on current values
@@ -41,6 +46,11 @@ type DaoAudit struct {
 	//TODO: confirm default go type includes timezone approach or update to alt that does
 	CreatedDt time.Time
 	UpdatedDt time.Time
+}
+
+//
+type ModelObject interface {
+	IsEmpty() bool
 }
 
 //DynamoSession - Implementation of DynamoSession
