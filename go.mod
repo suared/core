@@ -3,7 +3,7 @@ module github.com/suared/core
 go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.23.17
+	github.com/aws/aws-sdk-go v1.34.0
 	github.com/getsentry/sentry-go v0.4.0
 	github.com/golang-jwt/jwt/v4 v4.0.0
 	github.com/gorilla/mux v1.7.3
@@ -13,7 +13,4 @@ require (
 	github.com/segmentio/ksuid v1.0.2
 )
 
-require (
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
-	golang.org/dl v0.0.0-20220131190855-70de1b897271 // indirect
-)
+require github.com/jmespath/go-jmespath v0.3.0 // indirect
