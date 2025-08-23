@@ -3,8 +3,8 @@ package json
 import (
 	"testing"
 
-	"github.com/suared/core/file"
-	_ "github.com/suared/core/infra"
+	"github.com/suared/core/v2/file"
+	_ "github.com/suared/core/v2/infra"
 )
 
 /*

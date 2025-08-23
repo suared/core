@@ -9,10 +9,10 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/suared/core/api/middleware"
+	"github.com/suared/core/v2/api/middleware"
 
 	//Core Config setup
-	_ "github.com/suared/core/infra"
+	_ "github.com/suared/core/v2/infra"
 
 	"github.com/gorilla/mux"
 )

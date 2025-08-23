@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/suared/core/infra"
+	_ "github.com/suared/core/v2/infra"
 
 	"github.com/gorilla/mux"
 )

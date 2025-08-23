@@ -5,9 +5,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	coreerrors "github.com/suared/core/errors"
+	coreerrors "github.com/suared/core/v2/errors"
 	//Base infra setup for package
-	_ "github.com/suared/core/infra"
+	_ "github.com/suared/core/v2/infra"
 )
 
 //SetupErrorHandler - Will setup last resort error handler

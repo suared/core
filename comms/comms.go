@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/suared/core/security"
+	"github.com/suared/core/v2/security"
 )
 
 //Utilizing the test/e2e to start as a copy to allow this to grow as needed for service to service comms use cases

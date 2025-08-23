@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	coreerrors "github.com/suared/core/errors"
+	coreerrors "github.com/suared/core/v2/errors"
 )
 
 /* Successful Response body will always be as follows by request type:

@@ -5,12 +5,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/suared/core/repository"
-	"github.com/suared/core/repository/dynamodb"
+	"github.com/suared/core/v2/repository"
+	"github.com/suared/core/v2/repository/dynamodb"
 
-	"github.com/suared/core/security"
+	"github.com/suared/core/v2/security"
 
-	_ "github.com/suared/core/infra"
+	_ "github.com/suared/core/v2/infra"
 )
 
 /*

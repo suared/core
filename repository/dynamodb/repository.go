@@ -5,8 +5,8 @@ import (
     "fmt"
     "log"
 
-    _ "github.com/suared/core/infra"
-    "github.com/suared/core/repository"
+    _ "github.com/suared/core/v2/infra"
+    "github.com/suared/core/v2/repository"
 )
 
 //<<Repository>> - Database interface to the X table

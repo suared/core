@@ -7,7 +7,7 @@ import (
 	"runtime"
 
 	"github.com/joho/godotenv"
-	coreErrors "github.com/suared/core/errors"
+	coreErrors "github.com/suared/core/v2/errors"
 )
 
 //Go treats these as singleton so do not need to code singleton manually here

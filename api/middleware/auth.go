@@ -6,11 +6,11 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
-	"github.com/suared/core/errors"
-	"github.com/suared/core/security"
+	"github.com/suared/core/v2/errors"
+	"github.com/suared/core/v2/security"
 
 	//Base infra setup for package
-	_ "github.com/suared/core/infra"
+	_ "github.com/suared/core/v2/infra"
 )
 
 var isTest, isCognito bool

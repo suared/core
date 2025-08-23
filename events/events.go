@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
-	"github.com/suared/core/security"
-	"github.com/suared/core/types"
+	"github.com/suared/core/v2/security"
+	"github.com/suared/core/v2/types"
 )
 
 var debugLogger zerolog.Logger

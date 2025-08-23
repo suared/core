@@ -15,9 +15,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 
-	_ "github.com/suared/core/infra"
-	"github.com/suared/core/repository"
-	"github.com/suared/core/security"
+	_ "github.com/suared/core/v2/infra"
+	"github.com/suared/core/v2/repository"
+	"github.com/suared/core/v2/security"
 )
 
 //DAO marker interface - Dynamo specific for now, might make sense at some point to find generic names to work across

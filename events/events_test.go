@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/suared/core/types"
+	"github.com/suared/core/v2/types"
 )
 
 func TestEvents(t *testing.T) {

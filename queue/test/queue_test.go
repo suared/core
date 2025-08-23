@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/suared/core/queue"
+	"github.com/suared/core/v2/queue"
 )
 
 var testcounter int

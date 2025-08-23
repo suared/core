@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/suared/core/security"
+	"github.com/suared/core/v2/security"
 
 	sentry "github.com/getsentry/sentry-go"
 )
