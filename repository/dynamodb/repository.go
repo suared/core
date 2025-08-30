@@ -1,174 +1,201 @@
 package dynamodb
 
 import (
-    "context"
-    "fmt"
-    "log"
+	"context"
+	"fmt"
+	"reflect"
+	"time"
 
-    _ "github.com/suared/core/v2/infra"
-    "github.com/suared/core/v2/repository"
+	"github.com/suared/core/v2/repository"
+	"github.com/suared/core/v2/security"
 )
 
-//<<Repository>> - Database interface to the X table
-type Repository[dao DAO, usermodel ModelObject] struct {
-    config  repository.Config
-    session repository.Session
-	baseDAO dao
-	baseModel usermodel
+// DaoMapping defines the mapping between a user model and a custom DAO struct.
+// For DynamoDB, a custom DAO is required to define the hash and sort key fields.
+type DaoMapping[M any, D any] struct {
+	// FromModelFunc converts the user-facing model into the database DAO.
+	FromModelFunc func(ctx context.Context, model M) D
+	// ToModelFunc converts the database DAO back into the user-facing model.
+	ToModelFunc func(dao D) M
+	// HashKeyFunc extracts the hash key value from the DAO.
+	HashKeyFunc func(dao D) string
+	// SortKeyFunc extracts the sort key value from the DAO.
+	SortKeyFunc func(dao D) string
 }
 
-//Config - Returns the current configuration
-func (repo *Repository[dao, usermodel]) Config() repository.Config {
-    return repo.config
+// Repository is the generic DynamoDB repository.
+// It is generic for the model type M and the DAO type D.
+type Repository[M ModelObject, D any] struct {
+	config  repository.Config
+	session repository.Session
+	mapping DaoMapping[M, D]
 }
 
-//DAO - Returns a DAO associated with this repository from a model object
-func (repo *Repository[dao, usermodel]) DAO(ctx context.Context, userModel usermodel) (dao, error) {
-	localdao := repo.baseDAO.New()
-	localdao.SetUser(ctx)
-	localdao.Setup(userModel)
-
-	/* TODO: Move to DAO.Setup(model)
-    localdao.theModel = userModel
-
-    if zipme == true {
-        localdao.zipData = ziptools.GetGzipDataFromStruct(userModel)
-    }
-	*/
-    return localdao.(dao), nil
+// Config returns the repository's configuration.
+func (r *Repository[M, D]) Config() repository.Config {
+	return r.config
 }
 
-//Insert - Sample of a basic insert method with validation
-func (repo *Repository[dao, usermodel]) Insert(ctx context.Context, userModel usermodel) error {
-    // Populate the Data object First //  active?, audit?
-    localdao, err := repo.DAO(ctx, userModel)
-
-    if err != nil {
-        log.Printf("Unable to Insert DAO, error Getting DAO: %v", err)
-        return err
-    }
-
-    // Repository layer is responsible for validating auth rules
-    err = ValidAction(ctx, "insert", localdao)
-    if err != nil {
-        return err
-    }
-
-    return InsertOrUpdate(ctx, repo, localdao)
+// SetSession sets the repository's session.
+func (r *Repository[M, D]) SetSession(session repository.Session) {
+	r.session = session
 }
 
-//Update - Sample of updating a DB entry
-func (repo *Repository[dao, usermodel]) Update(ctx context.Context, userModel usermodel) error {
-    localdao, err := repo.DAO(ctx, userModel)
-    if err != nil {
-        log.Printf("Unable to Update, error getting DAO, err: %v", err)
-        return err
-    }
-
-    err = ValidAction(ctx, "update", localdao)
-    if err != nil {
-        return err
-    }
-
-    return InsertOrUpdate(ctx, repo, localdao)
-
+// Session returns the repository's session.
+func (r *Repository[M, D]) Session() repository.Session {
+	return r.session
 }
 
-//Delete - Sample of deleting a DB entry
-func (repo *Repository[dao, usermodel]) Delete(ctx context.Context, template usermodel) error {
-    localdao, err := repo.DAO(ctx, template)
-    if err != nil {
-        log.Printf("Unable getting Dao in Delete, err: %v", err)
-        return err
-    }
+// NewRepository creates a new DynamoDB repository with a custom DAO mapping.
+func NewRepository[M ModelObject, D any](config repository.Config, mapping DaoMapping[M, D]) (*Repository[M, D], error) {
+	repo := &Repository[M, D]{
+		config:  config,
+		mapping: mapping,
+	}
 
-    return Delete(ctx, repo, localdao)
+	_, err := CreateTable(repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize dynamodb table: %w", err)
+	}
+
+	return repo, nil
 }
 
-//Select - Sample of a get all by hashkey
-func (repo *Repository[dao, usermodel]) Select(ctx context.Context, template usermodel, strFilterVals ...string) ([]usermodel, error) {
-    localdao, err := repo.DAO(ctx, template)
-    if err != nil {
-        log.Printf("Unable to Select, error getting DAO, err: %v", err)
-        return nil, err
-    }
+// setAuditFields uses reflection to set audit fields on a DAO if it embeds BaseDAO.
+func setAuditFields(ctx context.Context, dao any) {
+	auth := security.GetAuth(ctx)
+	user := auth.GetUser()
+	now := time.Now().UTC()
 
-    result, err := Select(ctx, repo, localdao, strFilterVals...)
+	v := reflect.ValueOf(dao)
+	if v.Kind() != reflect.Ptr {
+		return // Must be a pointer to a struct
+	}
+	v = v.Elem()
+	if v.Kind() != reflect.Struct {
+		return
+	}
 
-    var outputList []usermodel
-    //since the search is for user, validation only needs to occur on one item..
-    var validated bool
-    for i := range result {
-        resultDAO := result[i]
-        //Check once only...
-        if !validated {
-            //ignore if no result/ empty
-            if resultDAO.HashKey() != "" {
-                err = ValidAction(ctx, "selectAll", resultDAO)
+	// Look for the embedded BaseDAO field.
+	baseField := v.FieldByName("BaseDAO")
+	if !baseField.IsValid() || baseField.Kind() != reflect.Struct {
+		return
+	}
 
-                if err != nil {
-                    return []usermodel{}, err
-                }
-            }
-        }
-        resultItem := result[i].GetModel()
-        outputList = append(outputList, resultItem.(usermodel))
-        //log.Printf("output list: %v", outputList)
-    }
+	// Check if it's a new record by looking at CreatedDt.
+	createdDtField := baseField.FieldByName("CreatedDt")
+	if createdDtField.IsValid() && createdDtField.CanSet() {
+		if createdDtField.Interface().(time.Time).IsZero() {
+			// It's a new record, set CreatedBy and CreatedDt.
+			createdByField := baseField.FieldByName("CreatedBy")
+			if createdByField.IsValid() && createdByField.CanSet() {
+				createdByField.SetString(user)
+			}
+			createdDtField.Set(reflect.ValueOf(now))
+		}
+	}
 
-    return outputList, err
-
+	// Always set the UpdatedBy and UpdatedDt fields.
+	updatedByField := baseField.FieldByName("UpdatedBy")
+	if updatedByField.IsValid() && updatedByField.CanSet() {
+		updatedByField.SetString(user)
+	}
+	updatedDtField := baseField.FieldByName("UpdatedDt")
+	if updatedDtField.IsValid() && updatedDtField.CanSet() {
+		updatedDtField.Set(reflect.ValueOf(now))
+	}
 }
 
-//SelectOne - Returns one model object, can be empty if no results
-func (repo *Repository[dao, usermodel]) SelectOne(ctx context.Context, template usermodel) (usermodel, error) {
-    var localmodel usermodel
-    localmodel = *new(usermodel)
-    localdao, err := repo.DAO(ctx, template)
-    if err != nil {
-        log.Printf("Unable to SelectOne, error getting DAO, err: %v", err)
-        return template, err
-    }
+// Insert adds a new item to the table.
+func (r *Repository[M, D]) Insert(ctx context.Context, model M) error {
+	dao := r.mapping.FromModelFunc(ctx, model)
 
-	//change this to return the specific type - deleted the convesion with this assumption so will error at first
-    result, err := SelectOne(ctx, repo, localdao)
+	// Set audit fields if the DAO has an embedded BaseDAO.
+	setAuditFields(ctx, &dao)
 
-    resultItem := result.GetModel().(usermodel)
+	if err := ValidAction(ctx, "insert", dao); err != nil {
+		return err
+	}
 
-    if resultItem.IsEmpty() {
-        err = ValidAction(ctx, "selectOne", result)
-
-        if err != nil {
-            return localmodel, err
-        }
-    }
-
-    return resultItem, err
-
+	return InsertOrUpdate(ctx, r, dao)
 }
 
-//SetSession - enables the library to store/ reuse the session for efficiency vs. creating new on each call
-func (repo *Repository[dao, usermodel]) SetSession(session repository.Session) {
-    repo.session = session
+// Update modifies an existing item in the table.
+func (r *Repository[M, D]) Update(ctx context.Context, model M) error {
+	dao := r.mapping.FromModelFunc(ctx, model)
+
+	// Set audit fields if the DAO has an embedded BaseDAO.
+	setAuditFields(ctx, &dao)
+
+	if err := ValidAction(ctx, "update", dao); err != nil {
+		return err
+	}
+
+	return InsertOrUpdate(ctx, r, dao)
 }
 
-//Session - Returns the session associated with this repository
-func (repo *Repository[dao, usermodel]) Session() repository.Session {
-    return repo.session
+// Delete removes an item from the table.
+func (r *Repository[M, D]) Delete(ctx context.Context, template M) error {
+	dao := r.mapping.FromModelFunc(ctx, template)
+	hashKey := r.mapping.HashKeyFunc(dao)
+	sortKey := r.mapping.SortKeyFunc(dao)
+
+	// We need the full DAO for the security check.
+	fullDAO, err := SelectOne[D](ctx, r, hashKey, sortKey)
+	if err != nil {
+		return fmt.Errorf("failed to get item for deletion check: %w", err)
+	}
+
+	if err := ValidAction(ctx, "delete", fullDAO); err != nil {
+		return err
+	}
+
+	return Delete(ctx, r, hashKey, sortKey)
 }
 
-//NewCategoryRepository - Initializes a sample repository with config values set
-func NewRepository[dao DAO, usermodel ModelObject](configMap repository.Config, localdao dao, localmodel usermodel) (*Repository[dao, usermodel], error) {
-    repo := &Repository[dao, usermodel]{}
-	repo.baseDAO = localdao
-	repo.baseModel = localmodel
-    repo.config = configMap
+// SelectOne retrieves a single item.
+func (r *Repository[M, D]) SelectOne(ctx context.Context, template M) (M, error) {
+	dao := r.mapping.FromModelFunc(ctx, template)
+	hashKey := r.mapping.HashKeyFunc(dao)
+	sortKey := r.mapping.SortKeyFunc(dao)
 
-    //Convert the config into an initialized dynamoo table
-    _, err := CreateTable(repo)
-    if err != nil {
-        return nil, fmt.Errorf("Unable to initialize category database session, received error: %v", err)
-    }
+	resultDAO, err := SelectOne[D](ctx, r, hashKey, sortKey)
+	if err != nil {
+		return *new(M), err
+	}
 
-    return repo, nil
+	if reflect.ValueOf(resultDAO).IsZero() {
+		return *new(M), nil // Not found
+	}
+
+	if err := ValidAction(ctx, "selectOne", resultDAO); err != nil {
+		return *new(M), err
+	}
+
+	return r.mapping.ToModelFunc(resultDAO), nil
+}
+
+// Select retrieves multiple items based on a hash key and optional filters.
+func (r *Repository[M, D]) Select(ctx context.Context, template M, strFilterVals ...string) ([]M, error) {
+	dao := r.mapping.FromModelFunc(ctx, template)
+	hashKey := r.mapping.HashKeyFunc(dao)
+
+	resultsDAO, err := Select[D](ctx, r, hashKey, strFilterVals...)
+	if err != nil {
+		return nil, err
+	}
+
+	var outputList []M
+	validated := false
+	for _, dao := range resultsDAO {
+		if !validated {
+			if err := ValidAction(ctx, "select", dao); err != nil {
+				return nil, err
+			}
+			validated = true
+		}
+		outputList = append(outputList, r.mapping.ToModelFunc(dao))
+	}
+
+	return outputList, nil
 }

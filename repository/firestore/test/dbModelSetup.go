@@ -1,81 +1,58 @@
-
 package test
 
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/suared/core/v2/repository/firestore"
 	"github.com/suared/core/v2/security"
-
-	_ "github.com/suared/core/v2/infra"
 )
 
-// sample caller model
-type TestModel struct {
+// TestUserModel is the user-facing model for testing.
+// It implements the firestore.ModelObject interface.
+type TestUserModel struct {
 	ID    string
 	Title string
 }
 
-func (model *TestModel) String() string {
-	return fmt.Sprintf("TestModel: model.ID=%v, model.Title=%v", model.ID, model.Title)
+func (m TestUserModel) IsEmpty() bool {
+	return m.ID == ""
 }
 
-// sample caller model wrapper
-type TestUserModel struct {
-	TestModel
+func (m TestUserModel) String() string {
+	return fmt.Sprintf("ID: %s, Title: %s", m.ID, m.Title)
 }
 
-func (model TestUserModel) IsEmpty() bool {
-	return model.ID == ""
+// MyCustomDAO is a custom DAO for the "advanced path" test.
+// It embeds the generic BaseDAO and adds custom fields.
+type MyCustomDAO struct {
+	firestore.BaseDAO[TestUserModel]
+	SearchKeywords []string `firestore:"searchKeywords"`
+	IsArchived     bool     `firestore:"isArchived"`
 }
 
-func (model *TestUserModel) String() string {
-	return fmt.Sprintf("TestUserModel: model.ID=%v, model.TestModel=%v", model.ID, model.TestModel)
+// ToModel converts the custom DAO back to the user model.
+func (d MyCustomDAO) ToModel() TestUserModel {
+	return d.Model
 }
 
-// TestDAO - Caller would implement the relevant DAO
-type TestDAO struct {
-	UserID     string
-	CollectionName string
-	DocIDValue string
-	TestUserModel
-}
+// FromModel creates a custom DAO from a user model.
+func FromModel(ctx context.Context, model TestUserModel) MyCustomDAO {
+	auth := security.GetAuth(ctx)
+	user := auth.GetUser()
+	now := time.Now().UTC()
 
-func (dao *TestDAO) Collection() string {
-	return dao.CollectionName
+	return MyCustomDAO{
+		BaseDAO: firestore.BaseDAO[TestUserModel]{
+			Model:     model,
+			CreatedBy: user,
+			UpdatedBy: user,
+			CreatedDt: now,
+			UpdatedDt: now,
+		},
+		SearchKeywords: strings.Split(model.Title, " "),
+		IsArchived:     false,
+	}
 }
-
-func (dao *TestDAO) DocID() string {
-	return dao.DocIDValue
-}
-
-func (dao *TestDAO) User() string {
-	return dao.UserID
-}
-
-func (dao *TestDAO) New() firestore.DAO {
-	return new(TestDAO)
-}
-
-func (dao *TestDAO) SetUser(ctx context.Context) {
-	dao.UserID = security.GetAuth(ctx).GetUser()
-}
-
-func (dao *TestDAO) Setup(model interface{}) {
-	thismodel := model.(TestUserModel)
-	dao.ID = thismodel.ID
-	dao.Title = thismodel.Title
-	dao.TestUserModel = thismodel
-}
-
-func (dao *TestDAO) GetModel() interface{} {
-	return dao.TestUserModel
-}
-
-func (dao *TestDAO) Refresh() {
-	dao.CollectionName = "test-collection"
-	dao.DocIDValue = dao.ID
-}
-
-func (dao *TestDAO) Populate() {}

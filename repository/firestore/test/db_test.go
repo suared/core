@@ -1,9 +1,9 @@
-
 package test
 
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/suared/core/v2/repository"
@@ -13,113 +13,142 @@ import (
 	_ "github.com/suared/core/v2/infra"
 )
 
-func TestDBSetup(t *testing.T) {
-	// Create Test Context
-	ctx := context.TODO()
-	ctx = security.SetupTestAuthFromContext(ctx, 1)
-
-	// Setup db props
-	configMap := repository.NewBasicConfig("TestDao")
+func setupConfig() repository.Config {
+	configMap := repository.NewBasicConfig("TestRepo")
 	configMap.AddEntry("backend", "firestore")
 	configMap.AddEntry("projectID", os.Getenv("PROCESS_FIRESTORE_PROJECT_ID"))
 	configMap.AddEntry("endpoint", os.Getenv("FIRESTORE_EMULATOR_HOST"))
 	configMap.AddEntry("env", os.Getenv("PROCESS_ENV"))
+	return configMap
+}
 
-	// Test DB Creation Successful
-	initializedRepo, err := firestore.NewRepository(configMap, &TestDAO{}, TestUserModel{})
+func TestSimplePath(t *testing.T) {
+	ctx := security.SetupTestAuthFromContext(context.Background(), 1)
+	config := setupConfig()
+
+	repo, err := firestore.NewRepository(config, firestore.ModelMapping[TestUserModel]{
+		Collection: "test-collection-simple",
+		DocIDFunc:  func(m TestUserModel) string { return m.ID },
+	})
 	if err != nil {
-		t.Fatalf("Repo initialization failed with: %v", err)
+		t.Fatalf("Repo initialization failed: %v", err)
 	}
 
-	testStruct := TestUserModel{}
-	testStruct.ID = "A"
-	testStruct.Title = "first test"
+	// Run tests
+	runTestSuite(t, ctx, repo, "Simple Path")
+}
 
-	// Test can insert/retrieve
-	err = initializedRepo.Insert(ctx, testStruct)
+func TestAdvancedPath(t *testing.T) {
+	ctx := security.SetupTestAuthFromContext(context.Background(), 1)
+	config := setupConfig()
+
+	repo, err := firestore.NewRepositoryWithDAO(config, firestore.DaoMapping[TestUserModel, MyCustomDAO]{
+		Collection: "test-collection-advanced",
+		DocIDFunc: func(dao MyCustomDAO) string {
+			return dao.Model.ID
+		},
+		FromModelFunc: FromModel,
+		ToModelFunc: func(dao MyCustomDAO) TestUserModel {
+			return dao.ToModel()
+		},
+	})
 	if err != nil {
-		t.Errorf("Unable to insert value, received err: %v", err)
+		t.Fatalf("Repo initialization failed: %v", err)
 	}
 
-	queryModel := TestUserModel{TestModel: TestModel{ID: "A"}}
-	valObject, err := initializedRepo.SelectOne(ctx, queryModel)
-	if err != nil {
-		t.Errorf("Unable to query value, received err: %v", err)
-	}
+	// Run tests
+	runTestSuite(t, ctx, repo, "Advanced Path")
 
-	if valObject != testStruct {
-		t.Errorf("non-matching struct.., received: %v, expected: %v", valObject, testStruct)
-	}
+	// Run specific checks for the advanced fields
+	t.Run("AdvancedPath_ExtraFields", func(t *testing.T) {
+		model := TestUserModel{ID: "C", Title: "advanced item check"}
+		if err := repo.Insert(ctx, model); err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
 
-	// Query for a specific value/selectOne test
-	testStruct2 := TestUserModel{TestModel: TestModel{ID: "B", Title: "2nd Item in table"}}
-	err = initializedRepo.Insert(ctx, testStruct2)
-	if err != nil {
-		t.Errorf("Unable to insert value 2, received err: %v", err)
-	}
+		// To check the extra fields, we need to query the raw DAO
+		retrievedDAO, err := firestore.SelectOne[MyCustomDAO](ctx, repo, repo.Collection, model.ID)
+		if err != nil {
+			t.Fatalf("SelectOne for raw DAO failed: %v", err)
+		}
 
-	queryModel2 := TestUserModel{TestModel: TestModel{ID: "B"}}
-	valObject, err = initializedRepo.SelectOne(ctx, queryModel2)
-	if err != nil {
-		t.Errorf("SelectOne: Unable to query value, received err: %v", err)
-	}
+		expectedKeywords := []string{"advanced", "item", "check"}
+		if !reflect.DeepEqual(retrievedDAO.SearchKeywords, expectedKeywords) {
+			t.Errorf("SearchKeywords mismatch: got %v, want %v", retrievedDAO.SearchKeywords, expectedKeywords)
+		}
 
-	if valObject.ID != "B" || valObject.Title != "2nd Item in table" {
-		t.Errorf("SelectOne: Unexpected results, received: %v", valObject)
-	}
+		if retrievedDAO.IsArchived != false {
+			t.Errorf("IsArchived mismatch: got %v, want false", retrievedDAO.IsArchived)
+		}
 
-	// Select "all" matching the hashkey test
-	valObjects, err := initializedRepo.Select(ctx, queryModel2)
-	if err != nil {
-		t.Errorf("Select: Unable to query value, received err: %v", err)
-	}
+		// Clean up
+		if err := repo.Delete(ctx, model); err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+	})
+}
 
-	if len(valObjects) != 2 {
-		t.Errorf("Expected 2 return value in query, received: %v", len(valObjects))
-	}
+// runTestSuite contains the actual test logic, runnable for any repo implementation.
+func runTestSuite(t *testing.T, ctx context.Context, repo *firestore.Repository[TestUserModel], suiteName string) {
+	t.Run(suiteName, func(t *testing.T) {
+		// 1. Insert
+		testModel := TestUserModel{ID: "A", Title: "first test"}
+		if err := repo.Insert(ctx, testModel); err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
 
-	// Use Select All to filter down to 1 value
-	valObjects, err = initializedRepo.Select(ctx, queryModel2, "Title", "==", "2nd Item in table")
-	if err != nil {
-		t.Errorf("Select: Unable to query value with filter, received err: %v", err)
-	}
+		// 2. SelectOne
+		retrieved, err := repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err != nil {
+			t.Fatalf("SelectOne failed: %v", err)
+		}
+		if retrieved != testModel {
+			t.Errorf("SelectOne retrieved wrong model. Got %v, want %v", retrieved, testModel)
+		}
 
-	if len(valObjects) != 1 {
-		t.Errorf("Expected 1 return value in query, received: %v", len(valObjects))
-	}
+		// 3. Insert another, then Select
+		testModel2 := TestUserModel{ID: "B", Title: "second test"}
+		if err := repo.Insert(ctx, testModel2); err != nil {
+			t.Fatalf("Insert (2) failed: %v", err)
+		}
 
-	// Test update
-	testStruct.Title = "Second Test"
-	err = initializedRepo.Update(ctx, testStruct)
-	if err != nil {
-		t.Errorf("Unable to update value, received err: %v", err)
-	}
+		// 4. Select with filter
+		all, err := repo.Select(ctx, TestUserModel{}, "model.Title", "==", "second test")
+		if err != nil {
+			t.Fatalf("Select failed: %v", err)
+		}
+		if len(all) != 1 {
+			t.Fatalf("Select got %d results, want 1", len(all))
+		}
+		if all[0] != testModel2 {
+			t.Errorf("Select retrieved wrong model. Got %v, want %v", all[0], testModel2)
+		}
 
-	valObject, err = initializedRepo.SelectOne(ctx, queryModel)
-	if err != nil {
-		t.Errorf("Unable to query value, received err: %v", err)
-	}
+		// 5. Update
+		updatedModel := TestUserModel{ID: "A", Title: "first test updated"}
+		if err := repo.Update(ctx, updatedModel); err != nil {
+			t.Fatalf("Update failed: %v", err)
+		}
+		retrieved, err = repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err != nil {
+			t.Fatalf("SelectOne after update failed: %v", err)
+		}
+		if retrieved != updatedModel {
+			t.Errorf("SelectOne after update retrieved wrong model. Got %v, want %v", retrieved, updatedModel)
+		}
 
-	if valObject != testStruct {
-		t.Errorf("non-matching struct.., received: %v, expected: %v", valObject, testStruct)
-	}
+		// 6. Delete
+		if err := repo.Delete(ctx, TestUserModel{ID: "A"}); err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+		retrieved, err = repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err == nil && !retrieved.IsEmpty() {
+			t.Errorf("SelectOne after delete should have failed or returned empty, but got: %v", retrieved)
+		}
 
-	// Test delete
-	err = initializedRepo.Delete(ctx, queryModel2)
-	if err != nil {
-		t.Errorf("Unable to delete value, received err: %v", err)
-	}
-
-	valObjects, err = initializedRepo.Select(ctx, queryModel2)
-	if err != nil {
-		t.Errorf("Select: Unable to query value after delete, received err: %v", err)
-	}
-
-	if len(valObjects) != 1 {
-		t.Errorf("Expected 1 return value in query, received: %v", len(valObjects))
-	}
-
-	if valObjects[0] != testStruct {
-		t.Errorf("Expected struct to be: %v, received: %v", testStruct, valObjects[0])
-	}
+		// 7. Clean up second item
+		if err := repo.Delete(ctx, TestUserModel{ID: "B"}); err != nil {
+			t.Fatalf("Delete (2) failed: %v", err)
+		}
+	})
 }

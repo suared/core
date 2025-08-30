@@ -11,4 +11,4 @@
 
 #Use built in jar as docker image does not support raspian naturally
 BASEDIR=$(dirname $0)
-java -Djava.library.path=$BASEDIR/../bin/DynamoDBLocal_lib -jar $BASEDIR/../bin/DynamoDBLocal.jar -port 9001 -inMemory -delayTransientStatuses
+java -Djava.library.path=$BASEDIR/../bin/DynamoDBLocal_lib -jar $BASEDIR/../bin/DynamoDBLocal.jar -port 9001 -sharedDb

@@ -3,113 +3,79 @@ package test
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/suared/core/v2/repository/dynamodb"
-
 	"github.com/suared/core/v2/security"
-
-	_ "github.com/suared/core/v2/infra"
 )
 
-/*
-
-In addition to validating the library this provides and easy reference on the bits that need to be implemented by a caller and can be copy/pasted as a start with a specific model based on the use case
-
-Debugging:
-CLI Reference: https://docs.aws.amazon.com/cli/latest/reference/dynamodb/index.html#cli-aws-dynamodb
-Command Example:  aws dynamodb scan --table-name "testTable" --endpoint-url http://localhost:9001
-Other:  not done intentionally (yet) is to force insert/ update to use condition-expression attribute_exists or not exists as appropriate
-
-	//Flow:
-	//Typical:  Callers (Model) --> Repository -->  Internal DAO from Model -->  Database
-	//Responsibilities Arch:
-	//	* Callers(Model) - Callers In  (( above ))
-	//  * Repository - Implementation in library, generated from DAO data
-	//  * Internal DAO from Model - Implementation options is library, option selection is caller
-	//  * Database - library
-*/
-
-//sample caller model
-type TestModel struct {
+// TestUserModel is the user-facing model for testing.
+type TestUserModel struct {
 	ID    string
 	Title string
 }
 
-func (model *TestModel) String() string {
-	return fmt.Sprintf("TestModel: model.ID=%v, model.Title=%v", model.ID, model.Title)
+func (m TestUserModel) IsEmpty() bool {
+	return m.ID == ""
 }
 
-//sample caller model wrapper for non-model adds (e.g. ui bits) to show it works with embedded structs
-type TestUserModel struct {
-	dummy string
-	TestModel
+func (m TestUserModel) String() string {
+	return fmt.Sprintf("ID: %s, Title: %s", m.ID, m.Title)
 }
 
-func (model TestUserModel) IsEmpty() bool {
-	return model.ID == ""
+// #############################################################################
+// # Simple DAO - Represents the most minimal DAO a user would create.
+// #############################################################################
+
+// SimpleTestDAO is the minimal custom DAO for testing.
+// It embeds the generic BaseDAO and defines the key fields for DynamoDB.
+type SimpleTestDAO struct {
+	dynamodb.BaseDAO[TestUserModel]
+	HKey string `dynamodbav:"MyCleverHashKeyName"`
+	SKey string `dynamodbav:"MyCleverSortKeyName"`
 }
 
-func (model *TestUserModel) String() string {
-	return fmt.Sprintf("TestuserModel: model.ID=%v, model.TestModel=%v", model.ID, model.TestModel)
+// FromModelSimple creates a minimal DAO from a user model.
+func FromModelSimple(ctx context.Context, model TestUserModel) SimpleTestDAO {
+	auth := security.GetAuth(ctx)
+	return SimpleTestDAO{
+		BaseDAO: dynamodb.BaseDAO[TestUserModel]{Model: model},
+		HKey:    "TestTable_" + auth.GetUser(),
+		SKey:    model.ID,
+	}
 }
 
-//TODO:  Create/Test active and audit options as well as zip conversion
-//sample DAO, the DAO requires to have the HashKey and SortKey fields mathing the names - how you do that is up to the DAO implementor.  In this example, the data is being duplicated vs. naming the fields to show a potential indirection path to allow growth
-
-//TestDAO - Caller would ipmlement the relevant DAO which would include the model to be saved along with any other key values (e.g. hash/sort for dynamo)
-type TestDAO struct {
-	UserID              string
-	MyCleverHashKeyName string
-	MyCleverSortKeyName string
-	TestUserModel
+// ToModelSimple converts the minimal DAO back to the user model.
+func ToModelSimple(dao SimpleTestDAO) TestUserModel {
+	return dao.Model
 }
 
-//HashKey - This is the value that would be set as the dynamo hashkey
-func (dao *TestDAO) HashKey() string {
-	return dao.MyCleverHashKeyName
+// #############################################################################
+// # Advanced DAO - Represents a DAO with additional, non-model fields.
+// #############################################################################
+
+// AdvancedTestDAO is a more complex DAO for testing, with extra fields.
+type AdvancedTestDAO struct {
+	dynamodb.BaseDAO[TestUserModel]
+	HKey           string   `dynamodbav:"MyCleverHashKeyName"`
+	SKey           string   `dynamodbav:"MyCleverSortKeyName"`
+	SearchKeywords []string `dynamodbav:"searchKeywords"`
+	IsArchived     bool     `dynamodbav:"isArchived"`
 }
 
-//SortKey - This is the value that would be set as the dynamo sortKey
-func (dao *TestDAO) SortKey() string {
-	return dao.MyCleverSortKeyName
+// FromModelAdvanced creates an advanced DAO from a user model.
+func FromModelAdvanced(ctx context.Context, model TestUserModel) AdvancedTestDAO {
+	auth := security.GetAuth(ctx)
+	return AdvancedTestDAO{
+		BaseDAO:        dynamodb.BaseDAO[TestUserModel]{Model: model},
+		HKey:           "TestTable_" + auth.GetUser(),
+		SKey:           model.ID,
+		SearchKeywords: strings.Split(model.Title, " "),
+		IsArchived:     false,
+	}
 }
 
-//User - the user that made this call
-func (dao *TestDAO) User() string {
-	return dao.UserID
-}
-
-//New - creates a new instance of this specific type to support return values of the right type
-func (dao *TestDAO) New() dynamodb.DAO {
-	return new(TestDAO)
-}
-
-func (dao *TestDAO) SetUser(ctx context.Context) {
-	dao.UserID = security.GetAuth(ctx).GetUser()
-}
-
-func (dao *TestDAO) Setup(model interface{}) {
-	thismodel := model.(TestUserModel)
-	dao.ID = thismodel.ID
-	dao.Title = thismodel.Title
-	dao.TestUserModel = thismodel
-}
-
-func (dao *TestDAO) GetModel() interface{} {
-	return dao.TestUserModel
-}
-
-func (dao *TestDAO) String() string {
-	return fmt.Sprintf("TestDAO: dao.ID=%v, dao.Title=%v, dao.TestModel=%v", dao.ID, dao.Title, dao.TestUserModel)
-}
-
-//Refresh - updates the Hashkey and SortKey.  Used by the library before calls
-func (dao *TestDAO) Refresh() {
-	dao.MyCleverHashKeyName = "TestTable_" + dao.UserID
-	dao.MyCleverSortKeyName = dao.ID
-}
-
-//Populate - For any additional actions, e.g. calculated columns, zip/unzip, etc
-func (dao *TestDAO) Populate() {
-
+// ToModelAdvanced converts the advanced DAO back to the user model.
+func ToModelAdvanced(dao AdvancedTestDAO) TestUserModel {
+	return dao.Model
 }

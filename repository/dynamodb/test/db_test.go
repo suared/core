@@ -3,171 +3,168 @@ package test
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/suared/core/v2/repository"
 	"github.com/suared/core/v2/repository/dynamodb"
-
 	"github.com/suared/core/v2/security"
 
 	_ "github.com/suared/core/v2/infra"
 )
 
-/*
-
-In addition to validating the library this provides and easy reference on the bits that need to be implemented by a caller and can be copy/pasted as a start with a specific model based on the use case
-
-Debugging:
-CLI Reference: https://docs.aws.amazon.com/cli/latest/reference/dynamodb/index.html#cli-aws-dynamodb
-Command Example:  aws dynamodb scan --table-name "testTable" --endpoint-url http://localhost:9001
-Other:  not done intentionally (yet) is to force insert/ update to use condition-expression attribute_exists or not exists as appropriate
-
-	//Flow:
-	//Typical:  Callers (Model) --> Repository -->  Internal DAO from Model -->  Database
-	//Responsibilities Arch:
-	//	* Callers(Model) - Callers In  (( above ))
-	//  * Repository - Definition is Caller, Implementation is library (( above for caller ))
-	//  * Internal DAO from Model - Implementation options is library, option selection is caller
-	//  * Database - library
-	// Create convenienience functions for the DAO to handle: zipme bool, active bool, audit bool
-*/
-
-//sample caller model
-//TODO: TestMode, TestUserModel, DAO are in the v1 file to be merged in the future
-
-//Validation of the library data lifecycle is here - only the above items are needed to setup for a specific caller
-
-func TestDBSetupv2(t *testing.T) {
-	//Create Test Context
-	ctx := context.TODO()
-	ctx = security.SetupTestAuthFromContext(ctx, 1)
-
-	//setup db props
+func setupConfig(t *testing.T) repository.Config {
 	configMap := repository.NewBasicConfig("TestDao")
+	os.Setenv("PROCESS_REPOSITORY", "dynamoDB")
+	os.Setenv("PROCESS_AWS_DYNAMOTABLE_CATEGORY", "test-table-dyn")
+	os.Setenv("PROCESS_AWS_REGION", "us-east-1")
+	os.Setenv("PROCESS_AWS_DYNAMOENDPOINT", "http://localhost:9001")
+	os.Setenv("PROCESS_AWS_DYNAMOTABLE_RCU", "5")
+	os.Setenv("PROCESS_AWS_DYNAMOTABLE_WCU", "5")
+	os.Setenv("PROCESS_ENV", "dev")
+	os.Setenv("AWS_ACCESS_KEY_ID", "dummy")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "dummy")
+
 	configMap.AddEntry("backend", os.Getenv("PROCESS_REPOSITORY"))
 	configMap.AddEntry("table", os.Getenv("PROCESS_AWS_DYNAMOTABLE_CATEGORY"))
 	configMap.AddEntry("region", os.Getenv("PROCESS_AWS_REGION"))
 	configMap.AddEntry("endpoint", os.Getenv("PROCESS_AWS_DYNAMOENDPOINT"))
 	configMap.AddEntry("rcu", os.Getenv("PROCESS_AWS_DYNAMOTABLE_RCU"))
 	configMap.AddEntry("wcu", os.Getenv("PROCESS_AWS_DYNAMOTABLE_WCU"))
-
 	configMap.AddEntry("hashKeyName", "MyCleverHashKeyName")
 	configMap.AddEntry("sortKeyName", "MyCleverSortKeyName")
 	configMap.AddEntry("env", os.Getenv("PROCESS_ENV"))
+	return configMap
+}
 
-	//Test DB Creation Successful (will return existing db table if exists, during testing will not exist the first time)
-	initializedRepo, err := dynamodb.NewRepository(configMap, &TestDAO{}, TestUserModel{})
+func TestSimplePath(t *testing.T) {
+	ctx := security.SetupTestAuthFromContext(context.Background(), 1)
+	config := setupConfig(t)
+
+	mapping := dynamodb.DaoMapping[TestUserModel, SimpleTestDAO]{
+		FromModelFunc: FromModelSimple,
+		ToModelFunc:   ToModelSimple,
+		HashKeyFunc:   func(dao SimpleTestDAO) string { return dao.HKey },
+		SortKeyFunc:   func(dao SimpleTestDAO) string { return dao.SKey },
+	}
+
+	repo, err := dynamodb.NewRepository(config, mapping)
 	if err != nil {
-		t.Errorf("Repo initialization failed with: %v", err)
+		t.Fatalf("Repo initialization failed: %v", err)
 	}
 
-	testStruct := TestUserModel{}
-	testStruct.ID = "A"
-	testStruct.Title = "first test"
+	runTestSuite(t, ctx, repo, "SimplePath")
+}
 
-	//Test can insert/ retrieve
-	err = initializedRepo.Insert(ctx, testStruct)
+func TestAdvancedPath(t *testing.T) {
+	ctx := security.SetupTestAuthFromContext(context.Background(), 2) // Use a different user for a clean hash key
+	config := setupConfig(t)
 
+	mapping := dynamodb.DaoMapping[TestUserModel, AdvancedTestDAO]{
+		FromModelFunc: FromModelAdvanced,
+		ToModelFunc:   ToModelAdvanced,
+		HashKeyFunc:   func(dao AdvancedTestDAO) string { return dao.HKey },
+		SortKeyFunc:   func(dao AdvancedTestDAO) string { return dao.SKey },
+	}
+
+	repo, err := dynamodb.NewRepository(config, mapping)
 	if err != nil {
-		t.Errorf("Unable to insert value, received err: %v", err)
+		t.Fatalf("Repo initialization failed: %v", err)
 	}
 
-	queryModel := TestUserModel{}
-	queryModel.ID = "A"
-	valObject, err := initializedRepo.SelectOne(ctx, queryModel)
+	// Run the standard test suite
+	runTestSuite(t, ctx, repo, "AdvancedPath")
 
-	if err != nil {
-		t.Errorf("Unable to query value, received err: %v", err)
-	}
+	// Run specific checks for the advanced fields
+	t.Run("AdvancedDAO_ExtraFields", func(t *testing.T) {
+		model := TestUserModel{ID: "C", Title: "advanced item check"}
+		if err := repo.Insert(ctx, model); err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
 
-	if valObject != testStruct {
-		t.Errorf("non-matching struct.., received: %v, expected: %v", valObject, testStruct)
-	}
+		// To check the extra fields, we need to query the raw DAO
+		hashKey := FromModelAdvanced(ctx, model).HKey
+		sortKey := FromModelAdvanced(ctx, model).SKey
+		retrievedDAO, err := dynamodb.SelectOne[AdvancedTestDAO](ctx, repo, hashKey, sortKey)
+		if err != nil {
+			t.Fatalf("SelectOne for raw DAO failed: %v", err)
+		}
 
-	//Query for a specific value/ selectOne test
-	testStruct2 := TestUserModel{}
-	testStruct2.ID = "B"
-	testStruct2.Title = "2nd Item in table"
+		expectedKeywords := []string{"advanced", "item", "check"}
+		if !reflect.DeepEqual(retrievedDAO.SearchKeywords, expectedKeywords) {
+			t.Errorf("SearchKeywords mismatch: got %v, want %v", retrievedDAO.SearchKeywords, expectedKeywords)
+		}
 
-	err = initializedRepo.Insert(ctx, testStruct2)
+		if retrievedDAO.IsArchived != false {
+			t.Errorf("IsArchived mismatch: got %v, want false", retrievedDAO.IsArchived)
+		}
 
-	if err != nil {
-		t.Errorf("Unable to insert value 2, received err: %v", err)
-	}
+		// Clean up
+		if err := repo.Delete(ctx, model); err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+	})
+}
 
-	queryModel2 := TestUserModel{}
-	queryModel2.ID = "B"
-	valObject, err = initializedRepo.SelectOne(ctx, queryModel2)
+// runTestSuite contains the core CRUD test logic, runnable for any repository configuration.
+func runTestSuite[D any](t *testing.T, ctx context.Context, repo *dynamodb.Repository[TestUserModel, D], suiteName string) {
+	t.Run(suiteName, func(t *testing.T) {
+		// 1. Insert
+		testModel := TestUserModel{ID: "A", Title: "first test"}
+		if err := repo.Insert(ctx, testModel); err != nil {
+			t.Fatalf("Insert failed: %v", err)
+		}
 
-	if err != nil {
-		t.Errorf("SelectOne: Unable to query value, received err: %v", err)
-	}
+		// 2. SelectOne
+		retrieved, err := repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err != nil {
+			t.Fatalf("SelectOne failed: %v", err)
+		}
+		if retrieved != testModel {
+			t.Errorf("SelectOne retrieved wrong model. Got %v, want %v", retrieved, testModel)
+		}
 
-	if valObject.ID != "B" && valObject.Title != "2nd Item in table" {
-		t.Errorf("SelectOne: Unexpected results, received: %v", valObject)
-	}
+		// 3. Insert another, then Select with filter
+		testModel2 := TestUserModel{ID: "B", Title: "second test"}
+		if err := repo.Insert(ctx, testModel2); err != nil {
+			t.Fatalf("Insert (2) failed: %v", err)
+		}
+		all, err := repo.Select(ctx, TestUserModel{}, "model.Title = :title", "title:S:second test")
+		if err != nil {
+			t.Fatalf("Select failed: %v", err)
+		}
+		if len(all) != 1 {
+			t.Fatalf("Select got %d results, want 1", len(all))
+		}
+		if all[0] != testModel2 {
+			t.Errorf("Select retrieved wrong model. Got %v, want %v", all[0], testModel2)
+		}
 
-	//select "all" matching the hashkey test
-	valObjects, err := initializedRepo.Select(ctx, queryModel2)
+		// 4. Update
+		updatedModel := TestUserModel{ID: "A", Title: "first test updated"}
+		if err := repo.Update(ctx, updatedModel); err != nil {
+			t.Fatalf("Update failed: %v", err)
+		}
+		retrieved, err = repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err != nil {
+			t.Fatalf("SelectOne after update failed: %v", err)
+		}
+		if retrieved != updatedModel {
+			t.Errorf("SelectOne after update retrieved wrong model. Got %v, want %v", retrieved, updatedModel)
+		}
 
-	if err != nil {
-		t.Errorf("Select: Unable to query value, received err: %v", err)
-	}
+		// 5. Delete
+		if err := repo.Delete(ctx, TestUserModel{ID: "A"}); err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+		retrieved, err = repo.SelectOne(ctx, TestUserModel{ID: "A"})
+		if err == nil && !retrieved.IsEmpty() {
+			t.Errorf("SelectOne after delete should have been empty, but got: %v", retrieved)
+		}
 
-	if len(valObjects) != 2 {
-		t.Errorf("Expected 2 return value in query, received: %v", len(valObjects))
-	}
-
-	//Use Select All to filter down to 1 value
-	valObjects, err = initializedRepo.Select(ctx, queryModel2, "Title = :title", "title:S:2nd Item in table")
-
-	if err != nil {
-		t.Errorf("Select: Unable to query value, received err: %v", err)
-	}
-
-	if len(valObjects) != 1 {
-		t.Errorf("Expected 1 return value in query, received: %v", len(valObjects))
-	}
-
-	//Test update
-	testStruct.Title = "Second Test"
-
-	//Test update of title
-	err = initializedRepo.Update(ctx, testStruct)
-
-	if err != nil {
-		t.Errorf("Unable to update value, received err: %v", err)
-	}
-
-	valObject, err = initializedRepo.SelectOne(ctx, queryModel)
-
-	if err != nil {
-		t.Errorf("Unable to query value, received err: %v", err)
-	}
-
-	if valObject != testStruct {
-		t.Errorf("non-matching struct.., received: %v, expected: %v", valObject, testStruct)
-	}
-
-	//Test delete
-	err = initializedRepo.Delete(ctx, queryModel2)
-
-	if err != nil {
-		t.Errorf("Unable to query value, received err: %v", err)
-	}
-
-	valObjects, err = initializedRepo.Select(ctx, queryModel2)
-
-	if err != nil {
-		t.Errorf("Select: Unable to query value, received err: %v", err)
-	}
-
-	if len(valObjects) != 1 {
-		t.Errorf("Expected 1 return value in query, received: %v", len(valObjects))
-	}
-
-	if valObjects[0] != testStruct {
-		t.Errorf("Expected struct to be: %v, received: %v", testStruct, valObjects[0])
-	}
-
+		// 6. Clean up second item
+		if err := repo.Delete(ctx, TestUserModel{ID: "B"}); err != nil {
+			t.Fatalf("Delete (2) failed: %v", err)
+		}
+	})
 }

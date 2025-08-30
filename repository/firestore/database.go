@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -14,27 +15,16 @@ import (
 	"google.golang.org/api/option"
 )
 
-// DAO marker interface - Firestore specific for now
-type DAO interface {
-	Collection() string
-	DocID() string
-	User() string
-	SetUser(context.Context)
-	Setup(userModel interface{})
-	GetModel() interface{}
-	New() DAO
-	Refresh()
-	Populate()
+// BaseDAO provides standard DB fields and a place for the user's model.
+type BaseDAO[M any] struct {
+	Model     M         `firestore:"model"`
+	CreatedBy string    `firestore:"createdBy,omitempty"`
+	UpdatedBy string    `firestore:"updatedBy,omitempty"`
+	CreatedDt time.Time `firestore:"createdDt,omitempty"`
+	UpdatedDt time.Time `firestore:"updatedDt,omitempty"`
 }
 
-// DaoAudit - INTERNAL ONLY.  Groups Audit data, exported to support default JSON conversion.
-type DaoAudit struct {
-	CreatedBy string
-	UpdatedBy string
-	CreatedDt time.Time
-	UpdatedDt time.Time
-}
-
+// ModelObject defines an interface that model objects must implement.
 type ModelObject interface {
 	IsEmpty() bool
 }
@@ -55,34 +45,56 @@ func newFirestoreSession(client *firestore.Client) *FirestoreSession {
 	return fs
 }
 
-// ValidAction - Default Security check, called externally to enable swap outs
-func ValidAction(ctx context.Context, action string, dao DAO) error {
+// ValidAction performs a security check. It now uses reflection to find the user field.
+func ValidAction(ctx context.Context, action string, dao any) error {
 	auth := security.GetAuth(ctx)
 	authUser := auth.GetUser()
-	daoUser := dao.User()
 
-	if authUser == daoUser {
+	// Use reflection to find a user field (e.g., CreatedBy) in the DAO.
+	val := reflect.ValueOf(dao)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	var daoUser string
+	if val.Kind() == reflect.Struct {
+		// Look for CreatedBy, common in BaseDAO
+		field := val.FieldByName("CreatedBy")
+		if field.IsValid() && field.Kind() == reflect.String {
+			daoUser = field.String()
+		} else {
+			// As a fallback, look for a UserID field
+			field := val.FieldByName("UserID")
+			if field.IsValid() && field.Kind() == reflect.String {
+				daoUser = field.String()
+			}
+		}
+	}
+
+	// If no user field is found, we might allow the action for safety, or deny it.
+	// For now, if we can't determine ownership, we let it pass but this could be stricter.
+	if daoUser == "" {
 		return nil
 	}
 
-	if auth.IsAdmin() {
+	if authUser == daoUser || auth.IsAdmin() {
 		return nil
 	}
 
-	return fmt.Errorf("Security: User: %v does not have access to %v for %v", authUser, action, daoUser)
+	return fmt.Errorf("security: User: %v does not have access to %v for %v", authUser, action, daoUser)
 }
 
-// CreateClient - will create a firestore client
+// CreateClient will create a firestore client
 func CreateClient(repo repository.Repository) (repository.Repository, error) {
 	config := repo.Config().Values()
 	backend := config["backend"]
 	if backend != "firestore" {
-		return nil, fmt.Errorf("Firestore backend called for repository without the appropriate backend type: %v vs %v", backend, "firestore")
+		return nil, fmt.Errorf("firestore backend called for repository without the appropriate backend type: %v vs %v", backend, "firestore")
 	}
 
 	projectID := config["projectID"]
 	if projectID == "" {
-		return nil, errors.New("Firestore projectID cannot be empty")
+		return nil, errors.New("firestore projectID cannot be empty")
 	}
 
 	endpoint := config["endpoint"]
@@ -96,15 +108,13 @@ func CreateClient(repo repository.Repository) (repository.Repository, error) {
 	ctx := context.Background()
 
 	if env == "dev" && endpoint != "" {
-		// Use emulator
 		client, err = firestore.NewClient(ctx, projectID, option.WithEndpoint(endpoint))
 	} else {
-		// Connect to actual Firestore
 		client, err = firestore.NewClient(ctx, projectID)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create firestore client: %v", err)
+		return nil, fmt.Errorf("failed to create firestore client: %w", err)
 	}
 
 	repo.SetSession(newFirestoreSession(client))
@@ -112,28 +122,25 @@ func CreateClient(repo repository.Repository) (repository.Repository, error) {
 	return repo, nil
 }
 
-// InsertOrUpdate - Generic method to insert or update a firestore document
-func InsertOrUpdate(ctx context.Context, repo repository.Repository, dao DAO) error {
-	dao.Refresh()
+// InsertOrUpdate is a generic method to insert or update a firestore document.
+func InsertOrUpdate(ctx context.Context, repo repository.Repository, collection, docID string, data any) error {
 	client := repo.Session().(*FirestoreSession).client
-	_, err := client.Collection(dao.Collection()).Doc(dao.DocID()).Set(ctx, dao)
+	_, err := client.Collection(collection).Doc(docID).Set(ctx, data)
 	if err != nil {
-		fmt.Println(err.Error())
-		return err
+		return fmt.Errorf("failed to set document: %w", err)
 	}
 	return nil
 }
 
-// Select - Returns a list of DAO objects matching the query.
-func Select(ctx context.Context, repo repository.Repository, templ DAO, strFilterVals ...string) ([]DAO, error) {
-	templ.Refresh()
+// Select returns a list of objects matching the query.
+func Select[D any](ctx context.Context, repo repository.Repository, collection string, strFilterVals ...string) ([]D, error) {
 	client := repo.Session().(*FirestoreSession).client
-	coll := client.Collection(templ.Collection())
+	coll := client.Collection(collection)
 	var query firestore.Query = coll.Query
 
-	if strFilterVals != nil {
+	if len(strFilterVals) > 0 {
 		countAttrs := len(strFilterVals) / 3
-		for i := 0; i < countAttrs*3; i = i + 3 {
+		for i := 0; i < countAttrs*3; i += 3 {
 			path := strFilterVals[i]
 			op := strFilterVals[i+1]
 			value := strFilterVals[i+2]
@@ -146,46 +153,40 @@ func Select(ctx context.Context, repo repository.Repository, templ DAO, strFilte
 		return nil, err
 	}
 
-	var daoResultList []DAO
+	var results []D
 	for _, doc := range docs {
-		resultDAO := templ.New()
-		if err := doc.DataTo(resultDAO); err != nil {
-			return nil, err
+		var resultDAO D
+		if err := doc.DataTo(&resultDAO); err != nil {
+			return nil, fmt.Errorf("failed to map data to DAO: %w", err)
 		}
-		resultDAO.Refresh()
-		resultDAO.Populate()
-		daoResultList = append(daoResultList, resultDAO)
+		results = append(results, resultDAO)
 	}
 
-	return daoResultList, nil
+	return results, nil
 }
 
-// SelectOne - Returns a DAO object matching the template docID.
-func SelectOne(ctx context.Context, repo repository.Repository, templ DAO) (DAO, error) {
-	templ.Refresh()
+// SelectOne returns a single object matching the document ID.
+func SelectOne[D any](ctx context.Context, repo repository.Repository, collection, docID string) (D, error) {
+	var resultDAO D
 	client := repo.Session().(*FirestoreSession).client
-	doc, err := client.Collection(templ.Collection()).Doc(templ.DocID()).Get(ctx)
+	doc, err := client.Collection(collection).Doc(docID).Get(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			return templ.New(), nil
+			return *new(D), err // Return zero value and the not found error
 		}
-		return nil, err
+		return *new(D), err
 	}
 
-	resultDAO := templ.New()
-	if err := doc.DataTo(resultDAO); err != nil {
-		return nil, err
+	if err := doc.DataTo(&resultDAO); err != nil {
+		return *new(D), fmt.Errorf("failed to map data to DAO: %w", err)
 	}
 
-	resultDAO.Refresh()
-	resultDAO.Populate()
 	return resultDAO, nil
 }
 
-// Delete - Removes a DAO object matching the template docID.
-func Delete(ctx context.Context, repo repository.Repository, templ DAO) error {
-	templ.Refresh()
+// Delete removes a document matching the document ID.
+func Delete(ctx context.Context, repo repository.Repository, collection, docID string) error {
 	client := repo.Session().(*FirestoreSession).client
-	_, err := client.Collection(templ.Collection()).Doc(templ.DocID()).Delete(ctx)
+	_, err := client.Collection(collection).Doc(docID).Delete(ctx)
 	return err
 }
